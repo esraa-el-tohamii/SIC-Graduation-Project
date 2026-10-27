@@ -1,0 +1,2820 @@
+﻿Total cells: 144
+================================================================================
+
+--- Cell 0 [code] ---
+import pandas as pd
+import numpy as np
+
+df = pd.read_csv("/kaggle/input/datasets/esraameltohamy/sic-proj/data.csv")
+
+print("Dataset Shape:", df.shape)
+
+print("\nFirst 5 Rows:")
+display(df.head())
+
+print("\nColumn Names:")
+print(df.columns[:10].tolist())
+
+print("\nFLAG Distribution:")
+print(df["FLAG"].value_counts(dropna=False))
+---END---
+
+--- Cell 1 [markdown] ---
+# Electricity Theft Detection
+
+This notebook explores the dataset, checks data quality, builds features, compares models, and explains the results.
+
+---END---
+
+--- Cell 2 [markdown] ---
+###  Load the dataset and check its size and columns.
+
+---END---
+
+--- Cell 3 [code] ---
+import pandas as pd
+import numpy as np
+
+df = pd.read_csv("/kaggle/input/datasets/esraameltohamy/sic-proj/data.csv")
+
+print("Dataset Shape:", df.shape)
+
+print("\nFirst 5 Rows:")
+display(df.head())
+
+print("\nColumn Names:")
+print(df.columns[:10].tolist())
+
+print("\nFLAG Distribution:")
+print(df["FLAG"].value_counts(dropna=False))
+---END---
+
+--- Cell 4 [markdown] ---
+###  Count missing values in each column.
+
+---END---
+
+--- Cell 5 [code] ---
+
+# Count missing values in each column
+missing_count = df.isnull().sum()
+
+# Calculate missing percentage
+missing_percent = (df.isnull().mean() * 100).round(2)
+
+# Create a report
+missing_report = pd.DataFrame({
+    "Missing_Count": missing_count,
+    "Missing_Percentage": missing_percent
+})
+
+# Show columns with the most missing values
+missing_report = missing_report.sort_values(
+    "Missing_Percentage",
+    ascending=False
+)
+
+display(missing_report.head(15))
+
+---END---
+
+--- Cell 6 [markdown] ---
+### Measure missing readings for each consumer.
+
+---END---
+
+--- Cell 7 [code] ---
+
+# Exclude the consumer ID and target label
+consumption_cols = df.columns[2:]
+
+# Calculate missing values for each consumer
+missing_per_consumer = df[consumption_cols].isnull().sum(axis=1)
+
+# Calculate missing percentage for each consumer
+missing_percent_per_consumer = (
+    missing_per_consumer / len(consumption_cols) * 100
+)
+
+print("Average missing readings per consumer:",
+      round(missing_per_consumer.mean(), 2))
+
+print("\nMissing readings per consumer:")
+print(missing_per_consumer.describe())
+
+print("\nConsumers with more than 50% missing readings:",
+      (missing_percent_per_consumer > 50).sum())
+
+print("Consumers with all readings missing:",
+      (missing_percent_per_consumer == 100).sum())
+
+---END---
+
+--- Cell 8 [markdown] ---
+### Summarize missing readings for each consumer.
+
+---END---
+
+--- Cell 9 [code] ---
+
+# Percentage of missing consumption readings per consumer
+missing_percent = (
+    df.iloc[:, 2:].isnull().mean(axis=1) * 100
+)
+
+# Combine missing percentage with the target label
+missing_analysis = pd.DataFrame({
+    "FLAG": df["FLAG"],
+    "Missing_Percentage": missing_percent
+})
+
+# Compare missing values between target classes
+display(
+    missing_analysis.groupby("FLAG")["Missing_Percentage"]
+    .agg(["count", "mean", "median", "max"])
+    .round(2)
+)
+
+---END---
+
+--- Cell 10 [markdown] ---
+### Find consumers whose consumption readings are all missing.
+
+---END---
+
+--- Cell 11 [code] ---
+
+# Find consumers with all consumption readings missing
+all_missing = df.iloc[:, 2:].isnull().all(axis=1)
+
+print("Consumers with all readings missing:", all_missing.sum())
+
+print("\nFLAG distribution among these consumers:")
+print(df.loc[all_missing, "FLAG"].value_counts(dropna=False))
+
+print("\nPercentage of consumers with all readings missing:")
+print(round(all_missing.mean() * 100, 4), "%")
+
+---END---
+
+--- Cell 12 [markdown] ---
+### Check duplicate IDs, duplicate rows, and missing labels.
+
+---END---
+
+--- Cell 13 [code] ---
+
+# Check duplicate consumer IDs
+print("Duplicate consumer IDs:",
+      df["CONS_NO"].duplicated().sum())
+
+# Check duplicate rows
+print("Duplicate rows:",
+      df.duplicated().sum())
+
+# Check missing IDs and target labels
+print("Missing consumer IDs:",
+      df["CONS_NO"].isna().sum())
+
+print("Missing FLAG values:",
+      df["FLAG"].isna().sum())
+
+---END---
+
+--- Cell 14 [markdown] ---
+###  Save an untouched copy and create a working copy.
+
+---END---
+
+--- Cell 15 [code] ---
+
+from pathlib import Path
+
+# Create folders for project outputs
+output_dir = Path("data/processed")
+output_dir.mkdir(parents=True, exist_ok=True)
+
+# Keep an untouched copy in memory
+df_original = df.copy(deep=True)
+
+# Create a working copy for cleaning
+df_clean = df.copy(deep=True)
+
+print("Original shape:", df_original.shape)
+print("Working copy shape:", df_clean.shape)
+print("Original data preserved:", df_original.equals(df))
+
+---END---
+
+--- Cell 16 [markdown] ---
+###  Measure missing values in each date column.
+
+---END---
+
+--- Cell 17 [code] ---
+
+# Identify consumption columns
+consumption_cols = df_clean.columns[2:]
+
+# Calculate missing percentage for each date
+missing_percent_cols = (
+    df_clean[consumption_cols].isnull().mean() * 100
+)
+
+print("Columns with more than 50% missing:",
+      (missing_percent_cols > 50).sum())
+
+print("Columns with more than 90% missing:",
+      (missing_percent_cols > 90).sum())
+
+print("\nColumns with less than or equal to 10% missing:",
+      (missing_percent_cols <= 10).sum())
+
+print("\nMissing percentage summary:")
+print(missing_percent_cols.describe().round(2))
+
+---END---
+
+--- Cell 18 [markdown] ---
+### Show dates with the most and fewest missing readings.
+
+---END---
+
+--- Cell 19 [code] ---
+
+# 10 dates with the most missing readings
+print("Top 10 dates with most missing values:")
+display(
+    missing_percent_cols.sort_values(
+        ascending=False
+    ).head(10).to_frame("Missing_Percentage")
+)
+
+# 10 dates with the fewest missing readings
+print("Top 10 dates with fewest missing values:")
+display(
+    missing_percent_cols.sort_values(
+        ascending=True
+    ).head(10).to_frame("Missing_Percentage")
+)
+
+---END---
+
+--- Cell 20 [markdown] ---
+### Select date columns with no more than 10% missing values.
+
+---END---
+
+--- Cell 21 [code] ---
+
+# Keep date columns with at most 10% missing values
+selected_dates = missing_percent_cols[
+    missing_percent_cols <= 10
+].index
+
+print("Date columns with <= 10% missing:",
+      len(selected_dates))
+
+print("\nTotal date columns:", len(consumption_cols))
+
+print("\nPercentage of dates selected:",
+      round(len(selected_dates) / len(consumption_cols) * 100, 2),
+      "%")
+
+print("\nFirst selected dates:")
+print(selected_dates[:10].tolist())
+
+---END---
+
+--- Cell 22 [markdown] ---
+### Summarize the selected dates by year.
+
+---END---
+
+--- Cell 23 [code] ---
+selected_dates_parsed = pd.to_datetime(
+    selected_dates,
+    format="%Y/%m/%d",
+    errors="coerce"
+).dropna()
+
+print("First selected date:", selected_dates_parsed.min())
+print("Last selected date:", selected_dates_parsed.max())
+
+print(
+    "Number of unique years:",
+    selected_dates_parsed.year.nunique()
+)
+
+print("\nSelected dates per year:")
+print(
+    pd.Series(selected_dates_parsed.year)
+    .value_counts()
+    .sort_index()
+)
+---END---
+
+--- Cell 24 [markdown] ---
+### Plot how missing readings change over time.
+
+---END---
+
+--- Cell 25 [code] ---
+
+import matplotlib.pyplot as plt
+
+# Calculate missing percentage for each date
+missing_by_date = df_clean.iloc[:, 2:].isnull().mean() * 100
+
+# Convert date column names into datetime
+dates = pd.to_datetime(
+    missing_by_date.index,
+    format="%Y/%m/%d",
+    errors="coerce"
+)
+
+# Build a monthly summary
+monthly_missing = pd.DataFrame({
+    "Date": dates,
+    "Missing_Percentage": missing_by_date.values
+}).dropna()
+
+monthly_missing["Month"] = (
+    monthly_missing["Date"].dt.to_period("M")
+)
+
+monthly_summary = (
+    monthly_missing.groupby("Month")["Missing_Percentage"]
+    .mean()
+)
+
+# Plot missing percentage by month
+monthly_summary.plot(figsize=(14, 5), marker="o")
+plt.title("Average Missing Readings by Month")
+plt.xlabel("Month")
+plt.ylabel("Average Missing Percentage (%)")
+plt.xticks(rotation=45)
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+---END---
+
+--- Cell 26 [markdown] ---
+### Compare missing-reading percentages between the two classes.
+
+---END---
+
+--- Cell 27 [code] ---
+
+# Calculate missing percentage for each consumer
+consumer_missing = df.iloc[:, 2:].isnull().mean(axis=1) * 100
+
+# Combine missingness with FLAG
+missing_by_flag = pd.DataFrame({
+    "FLAG": df["FLAG"],
+    "Missing_Percentage": consumer_missing
+})
+
+# Plot missingness distribution for each class
+missing_by_flag.boxplot(
+    column="Missing_Percentage",
+    by="FLAG",
+    figsize=(8, 5)
+)
+
+plt.title("Missing Readings by FLAG Class")
+plt.suptitle("")
+plt.xlabel("FLAG")
+plt.ylabel("Missing Readings (%)")
+plt.grid(True, axis="y")
+plt.show()
+
+---END---
+
+--- Cell 28 [markdown] ---
+### Compare basic consumption statistics for normal and theft classes.
+
+---END---
+
+--- Cell 29 [code] ---
+
+# Select consumption columns only
+consumption = df.iloc[:, 2:]
+
+# Calculate useful statistics for each consumer
+consumer_features = pd.DataFrame({
+    "FLAG": df["FLAG"],
+    "Available_Readings": consumption.notna().sum(axis=1),
+    "Mean_Consumption": consumption.mean(axis=1),
+    "Std_Consumption": consumption.std(axis=1),
+    "Zero_Readings_Percentage": (
+        consumption.eq(0).sum(axis=1)
+        / consumption.notna().sum(axis=1).replace(0, np.nan)
+        * 100
+    )
+})
+
+display(consumer_features.groupby("FLAG").mean().round(2))
+
+---END---
+
+--- Cell 30 [markdown] ---
+## Exploratory Data Analysis (EDA)
+
+These plots help us understand the target classes, missing data, and consumption patterns before modeling.
+
+---END---
+
+--- Cell 31 [markdown] ---
+### EDA: Show the number and percentage of normal and theft cases.
+
+---END---
+
+--- Cell 32 [code] ---
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+import numpy as np
+
+sns.set_theme(style="whitegrid")
+
+plt.figure(figsize=(7, 5))
+ax = sns.countplot(data=df, x="FLAG")
+
+plt.title("Distribution of Normal and Theft Cases")
+plt.xlabel("FLAG (0 = Normal, 1 = Theft)")
+plt.ylabel("Number of Consumers")
+
+for container in ax.containers:
+    ax.bar_label(container)
+
+plt.tight_layout()
+plt.show()
+
+print("Class percentages:")
+print((df["FLAG"].value_counts(normalize=True) * 100).round(2))
+---END---
+
+--- Cell 33 [markdown] ---
+### EDA: Compare missing-reading percentages by target class.
+
+---END---
+
+--- Cell 34 [code] ---
+missing_percent = df[consumption_cols].isnull().mean(axis=1) * 100
+
+eda_missing = pd.DataFrame({
+    "FLAG": df["FLAG"],
+    "Missing_Percentage": missing_percent
+})
+
+plt.figure(figsize=(8, 5))
+sns.boxplot(
+    data=eda_missing,
+    x="FLAG",
+    y="Missing_Percentage"
+)
+
+plt.title("Missing Readings by Consumer Class")
+plt.xlabel("FLAG (0 = Normal, 1 = Theft)")
+plt.ylabel("Missing Readings (%)")
+plt.tight_layout()
+plt.show()
+
+print(
+    eda_missing.groupby("FLAG")["Missing_Percentage"]
+    .agg(["mean", "median", "min", "max"])
+    .round(2)
+)
+---END---
+
+--- Cell 35 [markdown] ---
+### EDA: Compare average consumption between target classes.
+
+---END---
+
+--- Cell 36 [code] ---
+# Convert consumption readings to numeric values
+consumption_data = df[consumption_cols].apply(
+    pd.to_numeric, errors="coerce"
+)
+
+eda_mean = pd.DataFrame({
+    "FLAG": df["FLAG"],
+    "Mean_Consumption": consumption_data.mean(axis=1)
+})
+
+plt.figure(figsize=(8, 5))
+sns.boxplot(
+    data=eda_mean,
+    x="FLAG",
+    y="Mean_Consumption",
+    showfliers=False
+)
+
+plt.title("Mean Consumption by Consumer Class")
+plt.xlabel("FLAG (0 = Normal, 1 = Theft)")
+plt.ylabel("Mean Consumption")
+plt.tight_layout()
+plt.show()
+
+print(
+    eda_mean.groupby("FLAG")["Mean_Consumption"]
+    .agg(["mean", "median", "std"])
+    .round(2)
+)
+---END---
+
+--- Cell 37 [markdown] ---
+### EDA: Plot monthly average consumption for each target class.
+
+---END---
+
+--- Cell 38 [code] ---
+date_map = {}
+
+for col in consumption_cols:
+    parsed_date = pd.to_datetime(
+        str(col),
+        format="%Y/%m/%d",
+        errors="coerce"
+    )
+
+    if pd.isna(parsed_date):
+        parsed_date = pd.to_datetime(
+            str(col),
+            format="%Y-%m-%d",
+            errors="coerce"
+        )
+
+    if not pd.isna(parsed_date):
+        date_map[col] = parsed_date
+
+if not date_map:
+    print("No date columns were parsed. Check the column-name format.")
+else:
+    date_cols = list(date_map.keys())
+    monthly_data = consumption_data[date_cols].copy()
+
+    monthly_data.columns = pd.DatetimeIndex(
+        [date_map[col] for col in date_cols]
+    )
+
+    monthly_data = monthly_data.T
+    monthly_data.index = monthly_data.index.to_period("M")
+
+    monthly_by_class = {}
+
+    for flag in sorted(df["FLAG"].dropna().unique()):
+        mask = df["FLAG"] == flag
+        monthly_by_class[flag] = monthly_data.loc[:, mask].mean(axis=1)
+
+    monthly_summary = pd.DataFrame(monthly_by_class)
+    monthly_summary.index = monthly_summary.index.to_timestamp()
+    monthly_summary.columns = [
+        f"FLAG = {flag}" for flag in monthly_summary.columns
+    ]
+
+    monthly_summary.plot(figsize=(12, 5), marker="o")
+
+    plt.title("Monthly Average Consumption by Class")
+    plt.xlabel("Month")
+    plt.ylabel("Average Consumption")
+    plt.legend(title="Consumer Class")
+    plt.tight_layout()
+    plt.show()
+---END---
+
+--- Cell 39 [markdown] ---
+## Feature Engineering
+
+Create summary and monthly features from the consumption readings. These features will be used in the first model comparison.
+
+---END---
+
+--- Cell 40 [markdown] ---
+### Build summary and monthly features
+This cell creates statistical features and monthly trend features for each consumer.
+
+---END---
+
+--- Cell 41 [code] ---
+import numpy as np
+import pandas as pd
+
+RANDOM_STATE = 42
+
+# Sort consumption columns by actual date, not alphabetically
+_date_cols_all = list(df.columns[2:])
+date_cols = sorted(
+    _date_cols_all,
+    key=lambda c: pd.to_datetime(c, format="%Y/%m/%d", errors="coerce")
+)
+date_values = pd.to_datetime(date_cols, format="%Y/%m/%d", errors="coerce")
+
+# Check date coverage against the date range documented by the dataset
+full_range = pd.date_range("2014-01-01", "2016-10-31", freq="D")
+missing_days = sorted(set(full_range) - set(date_values.dropna()))
+print("Number of date columns:", len(date_cols))
+print("Days in documented range absent from the file:", missing_days)
+
+raw = df[date_cols].apply(pd.to_numeric, errors="coerce")
+y = df["FLAG"].astype(int)
+
+# Summary features, calculated only from observed readings
+avail = raw.notna().sum(axis=1)
+feat = pd.DataFrame(index=df.index)
+feat["Available_Readings"] = avail
+feat["Missing_Percentage"] = raw.isna().mean(axis=1) * 100
+feat["Mean_Consumption"] = raw.mean(axis=1)
+feat["Median_Consumption"] = raw.median(axis=1)
+feat["Std_Consumption"] = raw.std(axis=1)
+feat["Min_Consumption"] = raw.min(axis=1)
+feat["Max_Consumption"] = raw.max(axis=1)
+feat["Zero_Readings_Percentage"] = (
+    raw.eq(0).sum(axis=1) / avail.replace(0, np.nan) * 100
+)
+
+positive_mean = feat["Mean_Consumption"].where(feat["Mean_Consumption"] > 0)
+feat["CV_Consumption"] = feat["Std_Consumption"] / positive_mean
+feat["Max_to_Mean"] = feat["Max_Consumption"] / positive_mean
+feat["Q25_Consumption"] = raw.quantile(0.25, axis=1)
+feat["Q75_Consumption"] = raw.quantile(0.75, axis=1)
+feat["Skew_Consumption"] = raw.skew(axis=1)
+
+# Monthly average consumption features to capture seasonality/trend
+valid_date_mask = ~date_values.isna()
+raw = raw.loc[:, valid_date_mask]
+date_cols = list(raw.columns)
+date_values = pd.to_datetime(date_cols, format="%Y/%m/%d", errors="coerce")
+months = pd.PeriodIndex(date_values, freq="M")
+monthly = raw.T.groupby(months).mean().T
+feat["Monthly_Mean_Std"] = monthly.std(axis=1)
+feat["Monthly_Mean_CV"] = feat["Monthly_Mean_Std"] / positive_mean
+
+# Linear slope of monthly average consumption, ignoring missing months
+monthly_values = monthly.to_numpy(dtype=float)
+month_index = np.broadcast_to(np.arange(monthly_values.shape[1], dtype=float), monthly_values.shape)
+valid = np.isfinite(monthly_values)
+count = valid.sum(axis=1)
+t_mean = np.where(valid, month_index, 0).sum(axis=1) / np.maximum(count, 1)
+y_mean = np.where(valid, monthly_values, 0).sum(axis=1) / np.maximum(count, 1)
+numerator = np.where(valid, (month_index - t_mean[:, None]) * (monthly_values - y_mean[:, None]), 0).sum(axis=1)
+denominator = np.where(valid, (month_index - t_mean[:, None]) ** 2, 0).sum(axis=1)
+feat["Monthly_Trend_Slope"] = np.where(
+    (count >= 3) & (denominator > 0),
+    numerator / np.where(denominator > 0, denominator, 1),
+    np.nan,
+)
+
+# Compare latest 90 available chronological days with the overall mean
+feat["Last90_vs_Overall"] = raw.iloc[:, -90:].mean(axis=1) / positive_mean
+feat = feat.replace([np.inf, -np.inf], np.nan)
+
+print("Feature matrix shape:", feat.shape)
+print("Target distribution:")
+print(y.value_counts().sort_index())
+print("Missing values in engineered features:")
+print(feat.isna().sum()[feat.isna().sum() > 0])
+
+---END---
+
+--- Cell 42 [markdown] ---
+### Check relationships between engineered features
+This heatmap shows correlations between selected numerical features. High correlation means two features may contain similar information.
+
+---END---
+
+--- Cell 43 [code] ---
+# Select numeric engineered features, excluding the target label
+numeric_features = feat.select_dtypes(include="number").drop(
+    columns=["FLAG"], errors="ignore"
+).copy()
+
+selected_features = [
+    col for col in [
+        "Mean_Consumption", "Median_Consumption", "Std_Consumption",
+        "Min_Consumption", "Max_Consumption", "Zero_Readings_Percentage",
+        "Available_Readings", "Missing_Percentage", "Monthly_Mean_Std",
+        "Monthly_Trend_Slope", "Monthly_Mean_CV", "CV_Consumption"
+    ]
+    if col in numeric_features.columns
+]
+
+if len(selected_features) >= 2:
+    corr = numeric_features[selected_features].corr()
+    plt.figure(figsize=(11, 8))
+    sns.heatmap(corr, annot=True, fmt=".2f", cmap="coolwarm", center=0)
+    plt.title("Correlation Between Engineered Features")
+    plt.tight_layout()
+    plt.show()
+else:
+    print("Not enough numeric features were found for the correlation heatmap.")
+
+---END---
+
+--- Cell 44 [markdown] ---
+## Model Training and Cross-Validation
+
+We keep a separate test set for the final evaluation. Model choice and threshold selection use development data only.
+
+---END---
+
+--- Cell 45 [markdown] ---
+### Split the data and compare Logistic Regression, Random Forest, and XGBoost with 5-fold cross-validation.
+
+---END---
+
+--- Cell 46 [code] ---
+from sklearn.model_selection import train_test_split, StratifiedKFold
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import average_precision_score
+from xgboost import XGBClassifier
+
+# Remove target column from model features
+X = feat.drop(columns=["FLAG"], errors="ignore").copy()
+X = X.replace([np.inf, -np.inf], np.nan)
+
+# Split features and target
+X_dev, X_test, y_dev, y_test = train_test_split(
+    X, y, test_size=0.20, stratify=y, random_state=RANDOM_STATE
+)
+
+print("FLAG in model features:", "FLAG" in X_dev.columns)
+print("Development shape:", X_dev.shape)
+print("Test shape:", X_test.shape)
+print("Development shape:", X_dev.shape, "| Test shape:", X_test.shape)
+print("Theft rate ù development/test:", round(y_dev.mean(), 4), round(y_test.mean(), 4))
+
+
+def make_model(name, y_train):
+    # Compute class ratio using only the current training partition
+    scale_pos_weight = (y_train == 0).sum() / max((y_train == 1).sum(), 1)
+    if name == "Logistic Regression":
+        return make_pipeline(
+            SimpleImputer(strategy="median", add_indicator=True),
+            StandardScaler(),
+            LogisticRegression(class_weight="balanced", max_iter=2000, random_state=RANDOM_STATE),
+        )
+    if name == "Random Forest":
+        return make_pipeline(
+            SimpleImputer(strategy="median", add_indicator=True),
+            RandomForestClassifier(
+                n_estimators=300, min_samples_leaf=5,
+                class_weight="balanced_subsample", n_jobs=-1,
+                random_state=RANDOM_STATE,
+            ),
+        )
+    if name == "XGBoost":
+        return XGBClassifier(
+            n_estimators=400, learning_rate=0.05, max_depth=4,
+            subsample=0.8, colsample_bytree=0.8,
+            scale_pos_weight=scale_pos_weight,
+            eval_metric="aucpr", tree_method="hist", n_jobs=-1,
+            random_state=RANDOM_STATE,
+        )
+    raise ValueError(f"Unknown model: {name}")
+
+model_names = ["Logistic Regression", "Random Forest", "XGBoost"]
+skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
+oof = {name: np.zeros(len(X_dev), dtype=float) for name in model_names}
+fold_ap = {name: [] for name in model_names}
+
+for train_idx, valid_idx in skf.split(X_dev, y_dev):
+    X_fold_train, X_fold_valid = X_dev.iloc[train_idx], X_dev.iloc[valid_idx]
+    y_fold_train, y_fold_valid = y_dev.iloc[train_idx], y_dev.iloc[valid_idx]
+    for name in model_names:
+        model = make_model(name, y_fold_train)
+        model.fit(X_fold_train, y_fold_train)
+        probabilities = model.predict_proba(X_fold_valid)[:, 1]
+        oof[name][valid_idx] = probabilities
+        fold_ap[name].append(average_precision_score(y_fold_valid, probabilities))
+
+print("5-fold cross-validation complete.")
+
+---END---
+
+--- Cell 47 [markdown] ---
+### Compare cross-validation scores and choose a threshold using out-of-fold development predictions.
+
+---END---
+
+--- Cell 48 [code] ---
+from sklearn.metrics import (
+    precision_recall_curve, precision_score, recall_score, f1_score
+)
+
+
+def best_f1_threshold(y_true, probabilities):
+    precision, recall, thresholds = precision_recall_curve(y_true, probabilities)
+    if len(thresholds) == 0:
+        return 0.5
+    f1_values = (
+        2 * precision[:-1] * recall[:-1]
+        / np.clip(precision[:-1] + recall[:-1], 1e-12, None)
+    )
+    return float(thresholds[int(np.nanargmax(f1_values))])
+
+rows, thresholds = [], {}
+for name in model_names:
+    threshold = best_f1_threshold(y_dev.to_numpy(), oof[name])
+    thresholds[name] = threshold
+    predictions = (oof[name] >= threshold).astype(int)
+    rows.append({
+        "Model": name,
+        "PR-AUC mean (5 folds)": np.mean(fold_ap[name]),
+        "PR-AUC std (5 folds)": np.std(fold_ap[name]),
+        "F1-selected threshold": threshold,
+        "OOF Precision": precision_score(y_dev, predictions, zero_division=0),
+        "OOF Recall": recall_score(y_dev, predictions, zero_division=0),
+        "OOF F1": f1_score(y_dev, predictions, zero_division=0),
+    })
+
+cv_table = pd.DataFrame(rows).set_index("Model").sort_values(
+    "PR-AUC mean (5 folds)", ascending=False
+).round(4)
+print("Positive-class rate baseline for PR-AUC:", round(float(y_dev.mean()), 4))
+display(cv_table)
+best_model = cv_table.index[0]
+print("Model selected by mean cross-validated PR-AUC:", best_model)
+
+---END---
+
+--- Cell 49 [markdown] ---
+### Plot precision, recall, and F1 across different thresholds.
+
+---END---
+
+--- Cell 50 [code] ---
+from sklearn.metrics import precision_recall_curve
+
+threshold_model = best_model
+p_oof = oof[threshold_model]
+precision_vals, recall_vals, threshold_vals = precision_recall_curve(y_dev, p_oof)
+threshold_df = pd.DataFrame({
+    "Threshold": threshold_vals,
+    "Precision": precision_vals[:-1],
+    "Recall": recall_vals[:-1],
+})
+threshold_df["F1"] = (
+    2 * threshold_df["Precision"] * threshold_df["Recall"] /
+    (threshold_df["Precision"] + threshold_df["Recall"]).replace(0, np.nan)
+)
+threshold_df = threshold_df.replace([np.inf, -np.inf], np.nan).dropna()
+
+# Show thresholds that maximize F1 and thresholds with higher recall.
+best_f1_row = threshold_df.loc[threshold_df["F1"].idxmax()]
+recall_candidates = threshold_df[threshold_df["Precision"] >= 0.25]
+best_recall_row = recall_candidates.loc[recall_candidates["Recall"].idxmax()] if not recall_candidates.empty else None
+print(f"Model: {threshold_model}")
+print("Best F1 threshold from OOF predictions:")
+display(best_f1_row.to_frame("Value"))
+if best_recall_row is not None:
+    print("Highest-recall threshold with OOF precision >= 0.25 (illustrative constraint):")
+    display(best_recall_row.to_frame("Value"))
+
+fig, ax = plt.subplots(figsize=(8, 5))
+ax.plot(threshold_df["Threshold"], threshold_df["Precision"], label="Precision")
+ax.plot(threshold_df["Threshold"], threshold_df["Recall"], label="Recall")
+ax.plot(threshold_df["Threshold"], threshold_df["F1"], label="F1")
+ax.axvline(thresholds[threshold_model], linestyle="--", color="black", label="Selected F1 threshold")
+ax.set_xlabel("Probability threshold")
+ax.set_ylabel("Score")
+ax.set_title(f"OOF threshold analysis ù {threshold_model}")
+ax.legend()
+ax.grid(alpha=0.25)
+plt.tight_layout()
+plt.show()
+---END---
+
+--- Cell 51 [markdown] ---
+### Tune XGBoost settings using cross-validation on development data only.
+
+---END---
+
+--- Cell 52 [code] ---
+# Optional dependency: pip install xgboost
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.metrics import make_scorer
+
+try:
+    from xgboost import XGBClassifier
+except ImportError as exc:
+    raise ImportError("Install XGBoost in this environment first: pip install xgboost") from exc
+
+xgb_ratio = (y_dev == 0).sum() / max((y_dev == 1).sum(), 1)
+xgb_base = XGBClassifier(
+    objective="binary:logistic", eval_metric="aucpr", tree_method="hist",
+    scale_pos_weight=xgb_ratio, n_jobs=-1, random_state=RANDOM_STATE,
+)
+param_distributions = {
+    "n_estimators": [200, 350, 500],
+    "max_depth": [3, 4, 5],
+    "learning_rate": [0.03, 0.05, 0.08],
+    "subsample": [0.75, 0.9, 1.0],
+    "colsample_bytree": [0.7, 0.85, 1.0],
+    "min_child_weight": [1, 3, 5],
+    "reg_lambda": [1, 3, 5],
+}
+tuning_cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=RANDOM_STATE)
+xgb_search = RandomizedSearchCV(
+    estimator=xgb_base, param_distributions=param_distributions,
+    n_iter=12, scoring="average_precision", cv=tuning_cv,
+    random_state=RANDOM_STATE, n_jobs=1, verbose=1, refit=True,
+)
+xgb_search.fit(X_dev, y_dev)
+print("Best CV PR-AUC:", round(xgb_search.best_score_, 4))
+print("Best parameters:")
+print(xgb_search.best_params_)
+
+# Save the tuned model's development predictions for threshold selection only.
+tuned_oof = np.zeros(len(X_dev), dtype=float)
+for tr_idx, va_idx in tuning_cv.split(X_dev, y_dev):
+    fold_ratio = (y_dev.iloc[tr_idx] == 0).sum() / max((y_dev.iloc[tr_idx] == 1).sum(), 1)
+    fold_model = XGBClassifier(
+        **xgb_search.best_params_, objective="binary:logistic", eval_metric="aucpr",
+        tree_method="hist", scale_pos_weight=fold_ratio, n_jobs=-1,
+        random_state=RANDOM_STATE,
+    )
+    fold_model.fit(X_dev.iloc[tr_idx], y_dev.iloc[tr_idx])
+    tuned_oof[va_idx] = fold_model.predict_proba(X_dev.iloc[va_idx])[:, 1]
+tuned_threshold = best_f1_threshold(y_dev.to_numpy(), tuned_oof)
+print("Tuned XGBoost threshold selected from OOF development predictions:", round(tuned_threshold, 4))
+---END---
+
+--- Cell 53 [markdown] ---
+## Compare Feature Representations
+
+Compare engineered features, monthly averages, and raw daily readings using the same development rows and cross-validation. The test set is not used for this comparison.
+
+---END---
+
+--- Cell 54 [code] ---
+from sklearn.base import clone
+from sklearn.model_selection import cross_val_score
+
+# Build a monthly-average matrix using correctly chronological date columns.
+raw_for_compare = df[date_cols].apply(pd.to_numeric, errors="coerce")
+monthly_for_compare = raw_for_compare.T.groupby(months).mean().T
+monthly_for_compare.columns = [f"Monthly_{str(c)}" for c in monthly_for_compare.columns]
+
+# Ensure feature matrices share the exact same rows and target order.
+X_feature = feat.replace([np.inf, -np.inf], np.nan).copy()
+X_raw = raw_for_compare.replace([np.inf, -np.inf], np.nan).copy()
+X_monthly = monthly_for_compare.replace([np.inf, -np.inf], np.nan).copy()
+
+# One common split for this experiment; the existing X_dev/X_test split is reused by row index.
+idx_dev, idx_test = X_dev.index, X_test.index
+comparison_sets = {
+    "Engineered features": X_feature.loc[idx_dev],
+    "Monthly averages": X_monthly.loc[idx_dev],
+    "Raw daily readings": X_raw.loc[idx_dev],
+}
+comparison_cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=RANDOM_STATE)
+comparison_rows = []
+comparison_models = {}
+for label, X_candidate in comparison_sets.items():
+    scores = []
+    for tr_idx, va_idx in comparison_cv.split(X_candidate, y_dev):
+        y_tr, y_va = y_dev.iloc[tr_idx], y_dev.iloc[va_idx]
+        ratio = (y_tr == 0).sum() / max((y_tr == 1).sum(), 1)
+        candidate_model = XGBClassifier(
+            n_estimators=250, max_depth=4, learning_rate=0.05,
+            subsample=0.8, colsample_bytree=0.8,
+            objective="binary:logistic", eval_metric="aucpr", tree_method="hist",
+            scale_pos_weight=ratio, n_jobs=-1, random_state=RANDOM_STATE,
+        )
+        candidate_model.fit(X_candidate.iloc[tr_idx], y_tr)
+        p_va = candidate_model.predict_proba(X_candidate.iloc[va_idx])[:, 1]
+        scores.append(average_precision_score(y_va, p_va))
+    comparison_rows.append({"Feature representation": label,
+                            "CV PR-AUC mean": np.mean(scores),
+                            "CV PR-AUC std": np.std(scores),
+                            "Number of features": X_candidate.shape[1]})
+    comparison_models[label] = X_candidate
+
+feature_comparison_table = pd.DataFrame(comparison_rows).set_index("Feature representation").sort_values("CV PR-AUC mean", ascending=False).round(4)
+display(feature_comparison_table)
+print("Choose representation from CV only. If continuing to a final test comparison, fit the chosen representation on X_dev and evaluate once on X_test.")
+---END---
+
+--- Cell 55 [markdown] ---
+## Model Interpretation
+
+Feature importance shows which features the trained XGBoost model uses most. SHAP gives a more detailed explanation of feature effects when it is installed and runs successfully.
+
+---END---
+
+--- Cell 56 [code] ---
+# Fit an XGBoost model on the engineered features for interpretation.
+# This model is for explanation; final model selection remains based on CV metrics above.
+interpretation_ratio = (y_dev == 0).sum() / max((y_dev == 1).sum(), 1)
+if "xgb_search" in globals() and hasattr(xgb_search, "best_params_"):
+    interpretation_params = xgb_search.best_params_
+else:
+    interpretation_params = {"n_estimators": 400, "max_depth": 4, "learning_rate": 0.05,
+                             "subsample": 0.8, "colsample_bytree": 0.8}
+interpretation_model = XGBClassifier(
+    **interpretation_params, objective="binary:logistic", eval_metric="aucpr",
+    tree_method="hist", scale_pos_weight=interpretation_ratio,
+    n_jobs=-1, random_state=RANDOM_STATE,
+)
+interpretation_model.fit(X_dev, y_dev)
+
+importance = pd.Series(interpretation_model.feature_importances_, index=X_dev.columns).sort_values(ascending=False)
+print("Top 15 XGBoost feature importances:")
+display(importance.head(15).to_frame("Importance"))
+importance.head(15).sort_values().plot(kind="barh", figsize=(8, 5), title="Top 15 XGBoost feature importances")
+plt.xlabel("Importance")
+plt.tight_layout()
+plt.show()
+
+try:
+    import shap
+    # SHAP TreeExplainer works directly with tree-based XGBoost models.
+    shap_sample = X_test.sample(n=min(200, len(X_test)), random_state=RANDOM_STATE)
+    explainer = shap.TreeExplainer(interpretation_model)
+    shap_values = explainer(shap_sample)
+    shap.plots.beeswarm(shap_values, max_display=15)
+except ImportError:
+    print("SHAP is not installed. Run `%pip install shap` in the notebook, then rerun this cell.")
+except Exception as exc:
+    print("SHAP could not be plotted in this environment:", repr(exc))
+---END---
+
+--- Cell 57 [markdown] ---
+## Final Test Evaluation
+
+This is the final check on the held-out test set. The threshold was selected using development cross-validation, not the test set. Run this cell only after the earlier model and tuning cells have completed successfully.
+
+---END---
+
+--- Cell 58 [code] ---
+from sklearn.metrics import (
+    average_precision_score, classification_report, confusion_matrix,
+    ConfusionMatrixDisplay, precision_score, recall_score, f1_score
+)
+
+# Train the tuned XGBoost model on development data and evaluate once on the test set.
+final_model = XGBClassifier(
+    **xgb_search.best_params_,
+    objective="binary:logistic",
+    eval_metric="aucpr",
+    tree_method="hist",
+    scale_pos_weight=(y_dev == 0).sum() / max((y_dev == 1).sum(), 1),
+    n_jobs=-1,
+    random_state=RANDOM_STATE,
+)
+final_model.fit(X_dev, y_dev)
+
+test_probabilities = final_model.predict_proba(X_test)[:, 1]
+test_predictions = (test_probabilities >= tuned_threshold).astype(int)
+
+print("Final test results ù tuned XGBoost on engineered features")
+print("Threshold selected from development cross-validation:", round(tuned_threshold, 4))
+print("Test PR-AUC:", round(average_precision_score(y_test, test_probabilities), 4))
+print("Test Precision:", round(precision_score(y_test, test_predictions, zero_division=0), 4))
+print("Test Recall:", round(recall_score(y_test, test_predictions, zero_division=0), 4))
+print("Test F1:", round(f1_score(y_test, test_predictions, zero_division=0), 4))
+print("\nClassification report:")
+print(classification_report(y_test, test_predictions, zero_division=0))
+
+ConfusionMatrixDisplay.from_predictions(
+    y_test, test_predictions,
+    display_labels=["Normal (0)", "Theft (1)"],
+    cmap="Blues"
+)
+plt.title("Final Test Confusion Matrix ù Tuned XGBoost")
+plt.tight_layout()
+plt.show()
+
+---END---
+
+--- Cell 59 [code] ---
+
+from sklearn.metrics import (
+    average_precision_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    classification_report,
+    confusion_matrix
+)
+from xgboost import XGBClassifier
+import numpy as np
+import pandas as pd
+
+# 1. Prepare raw daily readings using the same development/test split
+X_raw_dev = X_raw.loc[idx_dev].replace([np.inf, -np.inf], np.nan)
+X_raw_test = X_raw.loc[idx_test].replace([np.inf, -np.inf], np.nan)
+
+# 2. Generate out-of-fold probabilities on development data
+# These predictions are used to choose the threshold without using the test set.
+raw_oof_prob = np.zeros(len(X_raw_dev), dtype=float)
+
+for train_idx, valid_idx in comparison_cv.split(X_raw_dev, y_dev):
+    y_train_fold = y_dev.iloc[train_idx]
+
+    fold_ratio = (
+        (y_train_fold == 0).sum()
+        / max((y_train_fold == 1).sum(), 1)
+    )
+
+    raw_model_fold = XGBClassifier(
+        **xgb_search.best_params_,
+        objective="binary:logistic",
+        eval_metric="aucpr",
+        tree_method="hist",
+        scale_pos_weight=fold_ratio,
+        n_jobs=-1,
+        random_state=RANDOM_STATE
+    )
+
+    raw_model_fold.fit(
+        X_raw_dev.iloc[train_idx],
+        y_train_fold
+    )
+
+    raw_oof_prob[valid_idx] = raw_model_fold.predict_proba(
+        X_raw_dev.iloc[valid_idx]
+    )[:, 1]
+
+# 3. Select the threshold using development OOF predictions only
+thresholds = np.unique(raw_oof_prob)
+best_threshold = 0.5
+best_f1 = -1
+
+for threshold in thresholds:
+    oof_pred = (raw_oof_prob >= threshold).astype(int)
+    score = f1_score(y_dev, oof_pred, zero_division=0)
+
+    if score > best_f1:
+        best_f1 = score
+        best_threshold = threshold
+
+print("Raw model threshold selected on development data:", round(best_threshold, 4))
+print("Development OOF F1 at selected threshold:", round(best_f1, 4))
+
+# 4. Train the final raw-data model on all development rows
+final_raw_model = XGBClassifier(
+    **xgb_search.best_params_,
+    objective="binary:logistic",
+    eval_metric="aucpr",
+    tree_method="hist",
+    scale_pos_weight=(y_dev == 0).sum() / max((y_dev == 1).sum(), 1),
+    n_jobs=-1,
+    random_state=RANDOM_STATE
+)
+
+final_raw_model.fit(X_raw_dev, y_dev)
+
+# 5. Evaluate exactly once on the held-out test set
+raw_test_prob = final_raw_model.predict_proba(X_raw_test)[:, 1]
+raw_test_pred = (raw_test_prob >= best_threshold).astype(int)
+
+raw_test_results = {
+    "Feature representation": "Raw daily readings",
+    "Test PR-AUC": average_precision_score(y_test, raw_test_prob),
+    "Test Precision": precision_score(y_test, raw_test_pred, zero_division=0),
+    "Test Recall": recall_score(y_test, raw_test_pred, zero_division=0),
+    "Test F1": f1_score(y_test, raw_test_pred, zero_division=0)
+}
+
+engineered_test_results = {
+    "Feature representation": "Engineered features",
+    "Test PR-AUC": average_precision_score(y_test, test_probabilities),
+    "Test Precision": precision_score(y_test, test_predictions, zero_division=0),
+    "Test Recall": recall_score(y_test, test_predictions, zero_division=0),
+    "Test F1": f1_score(y_test, test_predictions, zero_division=0)
+}
+
+comparison_test_results = pd.DataFrame(
+    [engineered_test_results, raw_test_results]
+).set_index("Feature representation").round(4)
+
+print("\nFinal comparison on the same held-out test set:")
+display(comparison_test_results)
+
+print("\nRaw daily readings classification report:")
+print(classification_report(y_test, raw_test_pred, zero_division=0))
+
+print("Raw daily readings confusion matrix:")
+print(confusion_matrix(y_test, raw_test_pred))
+
+---END---
+
+--- Cell 60 [markdown] ---
+### Final Model Comparison
+
+The XGBoost model trained on raw daily electricity consumption readings outperformed the model trained on engineered features on the held-out test set.
+
+The raw daily readings achieved a PR-AUC of **0.4689**, compared with **0.3309** for engineered features. The raw-data model also achieved higher precision (39.89%), recall (50.48%), and F1-score (0.4457).
+
+These results suggest that the original daily consumption patterns preserve useful information for detecting potential electricity theft. Further hyperparameter tuning specifically for raw features may improve performance.
+
+**Conclusion:** Raw daily readings are the stronger candidate based on the current test results. The comparison should be considered preliminary until model-specific tuning and final validation are completed.
+---END---
+
+--- Cell 61 [markdown] ---
+## CNN Experiment (Paper Pipeline)
+
+### Step 1: Clean the raw readings (fill missing, cap outliers, min-max)
+Follows Zheng et al.: missing days take the mean of neighbouring days, values above mean + 2╖std are capped, then each consumer is scaled to 0û1. The same train/test split as above is kept.
+---END---
+
+--- Cell 62 [code] ---
+import numpy as np
+
+def fill_missing(X):
+    X = X.copy()
+    nan = np.isnan(X)
+    prev = np.full_like(X, np.nan); nxt = np.full_like(X, np.nan)
+    prev[:, 1:] = X[:, :-1]; nxt[:, :-1] = X[:, 1:]
+    avg = (prev + nxt) / 2
+    X[nan] = np.where(np.isnan(avg[nan]), 0.0, avg[nan])
+    return X
+
+def cap_outliers(X):
+    mu = X.mean(axis=1, keepdims=True); sd = X.std(axis=1, keepdims=True)
+    return np.minimum(X, mu + 2 * sd)
+
+def minmax(X):
+    mn = X.min(axis=1, keepdims=True); mx = X.max(axis=1, keepdims=True)
+    rng = np.where(mx - mn == 0, 1.0, mx - mn)
+    return (X - mn) / rng
+
+
+raw_np = raw.to_numpy(dtype=np.float32)
+y_np = y.to_numpy()
+
+miss_pct = np.isnan(raw_np).mean(axis=1, keepdims=True).astype(np.float32)
+X_clean = minmax(cap_outliers(fill_missing(raw_np))).astype(np.float32)
+
+
+pos_dev = raw.index.get_indexer(idx_dev)
+pos_test = raw.index.get_indexer(idx_test)
+
+print("Shape:", X_clean.shape)
+print("NaNs after cleaning:", int(np.isnan(X_clean).sum()))
+print("Min/Max:", X_clean.min(), X_clean.max())
+print("Dev/Test:", len(pos_dev), len(pos_test))
+---END---
+
+--- Cell 63 [markdown] ---
+### Step 2: Reshape to weeks ╫ days and split the data
+Each consumer becomes a 2D table (weeks ╫ 7 days) for the CNN branch, plus the long 1D series (with missing percentage) for the wide branch. The development set is split into train and validation; the test set is untouched.
+---END---
+
+--- Cell 64 [code] ---
+import torch
+from sklearn.model_selection import train_test_split
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+print("Device:", device)
+
+
+n_days = X_clean.shape[1]
+n_weeks = int(np.ceil(n_days / 7))
+pad = n_weeks * 7 - n_days
+X_2d = np.pad(X_clean, ((0, 0), (0, pad))).reshape(-1, 1, n_weeks, 7)
+
+
+X_1d = np.hstack([X_clean, miss_pct])
+
+pos_tr, pos_val = train_test_split(
+    pos_dev, test_size=0.20, stratify=y_np[pos_dev], random_state=42
+)
+
+def make(ix):
+    return (torch.tensor(X_1d[ix]),
+            torch.tensor(X_2d[ix]),
+            torch.tensor(y_np[ix], dtype=torch.float32))
+
+T_tr, T_val, T_test = make(pos_tr), make(pos_val), make(pos_test)
+
+print("2D shape:", X_2d.shape, "| 1D shape:", X_1d.shape)
+print("Train/Val/Test:", len(pos_tr), len(pos_val), len(pos_test))
+print("Theft rate train/val/test:",
+      y_np[pos_tr].mean().round(4), y_np[pos_val].mean().round(4), y_np[pos_test].mean().round(4))
+---END---
+
+--- Cell 65 [markdown] ---
+### Step 3: Build the Wide & Deep CNN model
+The wide branch is a dense layer on the long 1D series. The deep branch is a 3-layer CNN on the weeks ╫ days table. The `mode` option lets us train wide-only, deep-only, or both for the ablation.
+---END---
+
+--- Cell 66 [code] ---
+import torch.nn as nn
+
+class WideDeep(nn.Module):
+    def __init__(self, wide_in, mode="both"):
+        super().__init__()
+        self.mode = mode
+        self.wide = nn.Sequential(nn.Linear(wide_in, 128), nn.ReLU(), nn.Dropout(0.3))
+        self.deep = nn.Sequential(
+            nn.Conv2d(1, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d((2, 1)),
+            nn.Conv2d(16, 32, 3, padding=1), nn.ReLU(), nn.MaxPool2d((2, 1)),
+            nn.Conv2d(32, 64, 3, padding=1), nn.ReLU(), nn.AdaptiveAvgPool2d((4, 7)),
+            nn.Flatten(), nn.Dropout(0.3), nn.Linear(64 * 4 * 7, 128), nn.ReLU(),
+        )
+        head_in = {"wide": 128, "deep": 128, "both": 256}[mode]
+        self.head = nn.Sequential(nn.Dropout(0.3), nn.Linear(head_in, 1))
+
+    def forward(self, x1d, x2d):
+        parts = []
+        if self.mode in ("wide", "both"):
+            parts.append(self.wide(x1d))
+        if self.mode in ("deep", "both"):
+            parts.append(self.deep(x2d))
+        return self.head(torch.cat(parts, dim=1)).squeeze(1)
+
+# ╟╬╩╚╟╤ ╙╤و┌ ┼غ ╟ط├╚┌╟╧ ع┘╚µ╪╔
+for m in ["wide", "deep", "both"]:
+    net = WideDeep(X_1d.shape[1], m).to(device)
+    out = net(T_tr[0][:4].to(device), T_tr[1][:4].to(device))
+    n_params = sum(p.numel() for p in net.parameters())
+    print(f"{m:5s} | output shape: {tuple(out.shape)} | parameters: {n_params:,}")
+---END---
+
+--- Cell 67 [markdown] ---
+
+### Step 4: Train the three models (wide, deep, both)
+Each model trains on the training set with class weighting for the imbalance. After every epoch we measure PR-AUC on the validation set and keep the best epoch, stopping early if it does not improve. The test set is not used here.
+> Add blockquote
+
+
+---END---
+
+--- Cell 68 [code] ---
+import copy
+from torch.utils.data import DataLoader, TensorDataset
+from sklearn.metrics import average_precision_score
+
+@torch.no_grad()
+def predict(model, T, bs=1024):
+    model.eval()
+    out = []
+    for i in range(0, len(T[0]), bs):
+        logits = model(T[0][i:i + bs].to(device), T[1][i:i + bs].to(device))
+        out.append(torch.sigmoid(logits).cpu().numpy())
+    return np.concatenate(out)
+
+def train_model(mode, epochs=30, bs=256, lr=1e-3, patience=6):
+    model = WideDeep(X_1d.shape[1], mode).to(device)
+    pos_w = torch.tensor((y_np[pos_tr] == 0).sum() / max((y_np[pos_tr] == 1).sum(), 1),
+                         dtype=torch.float32, device=device)
+    loss_fn = nn.BCEWithLogitsLoss(pos_weight=pos_w)
+    opt = torch.optim.Adam(model.parameters(), lr=lr)
+    g = torch.Generator().manual_seed(42)
+    loader = DataLoader(TensorDataset(*T_tr), batch_size=bs, shuffle=True, generator=g)
+
+    best_ap, best_state, bad = -1.0, None, 0
+    for ep in range(1, epochs + 1):
+        model.train()
+        for a, b, t in loader:
+            a, b, t = a.to(device), b.to(device), t.to(device)
+            opt.zero_grad()
+            loss_fn(model(a, b), t).backward()
+            opt.step()
+        val_ap = average_precision_score(y_np[pos_val], predict(model, T_val))
+        print(f"[{mode}] epoch {ep:02d} | val PR-AUC {val_ap:.4f}")
+        if val_ap > best_ap:
+            best_ap, best_state, bad = val_ap, copy.deepcopy(model.state_dict()), 0
+        else:
+            bad += 1
+            if bad >= patience:
+                print(f"[{mode}] early stop")
+                break
+    model.load_state_dict(best_state)
+    return model, best_ap
+
+trained, val_scores = {}, {}
+for mode in ["wide", "deep", "both"]:
+    trained[mode], val_scores[mode] = train_model(mode)
+
+print("\nBest validation PR-AUC per model:")
+for m, s in val_scores.items():
+    print(f"  {m:5s}: {s:.4f}")
+---END---
+
+--- Cell 69 [markdown] ---
+### Step 5: Evaluate on the test set with the paper's metrics
+All three models are scored once on the held-out test set using ROC-AUC, PR-AUC, MAP@100 and MAP@200, then compared with the earlier XGBoost results. No model choice or tuning is done on these numbers.
+---END---
+
+--- Cell 70 [code] ---
+import pandas as pd
+from sklearn.metrics import roc_auc_score
+
+def map_at_n(y_true, score, n):
+    """Mean of precision@i for i = 1..n over the top-n ranked consumers."""
+    top = y_true[np.argsort(-score)[:n]]
+    return float((np.cumsum(top) / np.arange(1, len(top) + 1)).mean())
+
+y_test_np = y_np[pos_test]
+rows = []
+for mode, model in trained.items():
+    p = predict(model, T_test)
+    rows.append({
+        "Model": f"CNN - {mode}",
+        "ROC-AUC": roc_auc_score(y_test_np, p),
+        "PR-AUC": average_precision_score(y_test_np, p),
+        "MAP@100": map_at_n(y_test_np, p, 100),
+        "MAP@200": map_at_n(y_test_np, p, 200),
+    })
+
+cnn_results = pd.DataFrame(rows).set_index("Model").round(4)
+print("Theft rate in test (PR-AUC baseline):", round(float(y_test_np.mean()), 4))
+display(cnn_results)
+
+
+xgb_ref = pd.DataFrame(
+    {"PR-AUC": [0.4689, 0.3309]},
+    index=["XGBoost - raw daily", "XGBoost - engineered"]
+)
+display(xgb_ref)
+---END---
+
+--- Cell 71 [markdown] ---
+### Compare XGBoost with the CNN using the same metrics
+---END---
+
+--- Cell 72 [code] ---
+xgb_raw_p = np.asarray(raw_test_prob)
+print("XGBoost raw | ROC-AUC:", round(roc_auc_score(y_test_np, xgb_raw_p), 4),
+      "| PR-AUC:", round(average_precision_score(y_test_np, xgb_raw_p), 4),
+      "| MAP@100:", round(map_at_n(y_test_np, xgb_raw_p, 100), 4),
+      "| MAP@200:", round(map_at_n(y_test_np, xgb_raw_p, 200), 4))
+
+---END---
+
+--- Cell 73 [markdown] ---
+### Step 6: Improve the CNN (missing-value mask channel + BatchNorm)
+The CNN sees interpolated data, so it loses the pattern of where readings were missing. We add that pattern as a second image channel, add BatchNorm for stable training, and compare on the validation set only.
+---END---
+
+--- Cell 74 [code] ---
+import copy
+from torch.utils.data import DataLoader, TensorDataset
+
+mask = np.isnan(raw_np).astype(np.float32)
+mask_2d = np.pad(mask, ((0, 0), (0, pad))).reshape(-1, 1, n_weeks, 7)
+X_2d_v2 = np.concatenate([X_2d, mask_2d], axis=1)
+def make_v2(ix):
+    return (torch.tensor(X_1d[ix]), torch.tensor(X_2d_v2[ix]),
+            torch.tensor(y_np[ix], dtype=torch.float32))
+
+T_tr2, T_val2, T_test2 = make_v2(pos_tr), make_v2(pos_val), make_v2(pos_test)
+
+# 2) ╟طعµ╧وط
+def conv_block(i, o, pool):
+    layers = [nn.Conv2d(i, o, 3, padding=1), nn.BatchNorm2d(o), nn.ReLU()]
+    if pool:
+        layers.append(nn.MaxPool2d((2, 1)))
+    return layers
+
+class WideDeepV2(nn.Module):
+    def __init__(self, wide_in, in_ch=2):
+        super().__init__()
+        self.wide = nn.Sequential(nn.Linear(wide_in, 128), nn.BatchNorm1d(128),
+                                  nn.ReLU(), nn.Dropout(0.3))
+        self.deep = nn.Sequential(
+            *conv_block(in_ch, 16, True), *conv_block(16, 32, True), *conv_block(32, 64, False),
+            nn.AdaptiveAvgPool2d((4, 7)), nn.Flatten(), nn.Dropout(0.3),
+            nn.Linear(64 * 4 * 7, 128), nn.ReLU(),
+        )
+        self.head = nn.Sequential(nn.Dropout(0.3), nn.Linear(256, 1))
+
+    def forward(self, x1d, x2d):
+        return self.head(torch.cat([self.wide(x1d), self.deep(x2d)], dim=1)).squeeze(1)
+
+def train_v2(T_train, T_valid, seed=42, epochs=25, bs=256, lr=1e-3, patience=6):
+    torch.manual_seed(seed)
+    model = WideDeepV2(X_1d.shape[1]).to(device)
+    pos_w = torch.tensor((y_np[pos_tr] == 0).sum() / max((y_np[pos_tr] == 1).sum(), 1),
+                         dtype=torch.float32, device=device)
+    loss_fn = nn.BCEWithLogitsLoss(pos_weight=pos_w)
+    opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
+    sched = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, mode="max", factor=0.5, patience=2)
+    g = torch.Generator().manual_seed(seed)
+    loader = DataLoader(TensorDataset(*T_train), batch_size=bs, shuffle=True,
+                        generator=g, drop_last=True)
+
+    best_ap, best_state, bad = -1.0, None, 0
+    for ep in range(1, epochs + 1):
+        model.train()
+        for a, b, t in loader:
+            a, b, t = a.to(device), b.to(device), t.to(device)
+            opt.zero_grad()
+            loss_fn(model(a, b), t).backward()
+            opt.step()
+        val_ap = average_precision_score(y_np[pos_val], predict(model, T_valid))
+        sched.step(val_ap)
+        print(f"[v2 seed {seed}] epoch {ep:02d} | val PR-AUC {val_ap:.4f}")
+        if val_ap > best_ap:
+            best_ap, best_state, bad = val_ap, copy.deepcopy(model.state_dict()), 0
+        else:
+            bad += 1
+            if bad >= patience:
+                print("early stop")
+                break
+    model.load_state_dict(best_state)
+    return model, best_ap
+
+model_v2, val_ap_v2 = train_v2(T_tr2, T_val2)
+print("\nOld CNN (both) best val PR-AUC:", round(val_scores["both"], 4))
+print("New CNN (v2)   best val PR-AUC:", round(val_ap_v2, 4))
+---END---
+
+--- Cell 75 [markdown] ---
+### Ablation: is the missing-mask channel responsible for the improvement?
+Same v2 model, but the mask channel is set to zero. Compared on the validation set only.
+---END---
+
+--- Cell 76 [markdown] ---
+
+---END---
+
+--- Cell 77 [code] ---
+zero_mask = torch.tensor([1.0, 0.0]).view(1, 2, 1, 1)
+T_tr_nm  = (T_tr2[0],  T_tr2[1]  * zero_mask, T_tr2[2])
+T_val_nm = (T_val2[0], T_val2[1] * zero_mask, T_val2[2])
+
+_, val_ap_nomask = train_v2(T_tr_nm, T_val_nm)
+print("\nv2 with mask   :", round(val_ap_v2, 4))
+print("v2 without mask:", round(val_ap_nomask, 4))
+---END---
+
+--- Cell 78 [markdown] ---
+### Step 7: Ensemble of 5 seeds (validation only)
+The v2 CNN is trained with 5 different seeds and the predicted probabilities are averaged. The test set is still untouched.
+---END---
+
+--- Cell 79 [code] ---
+seeds = [42, 7, 123, 2024, 99]
+ens_models, val_probs = [], []
+
+for s in seeds:
+    m, ap = train_v2(T_tr2, T_val2, seed=s)
+    ens_models.append(m)
+    val_probs.append(predict(m, T_val2))
+    print(f"seed {s}: best val PR-AUC {ap:.4f}\n")
+
+val_ens = np.mean(val_probs, axis=0)
+single = [average_precision_score(y_np[pos_val], p) for p in val_probs]
+print("Single seeds val PR-AUC: mean", round(np.mean(single), 4), "+/-", round(np.std(single), 4))
+print("Ensemble val PR-AUC    :", round(average_precision_score(y_np[pos_val], val_ens), 4))
+---END---
+
+--- Cell 80 [code] ---
+
+---END---
+
+--- Cell 81 [markdown] ---
+### Step 8: Final test evaluation of the 5-seed CNN ensemble
+The ensemble is scored once on the held-out test set and compared with the XGBoost models. No further tuning is done after seeing these numbers.
+---END---
+
+--- Cell 82 [code] ---
+test_probs = [predict(m, T_test2) for m in ens_models]
+p_ens = np.mean(test_probs, axis=0)
+
+final_cnn = {
+    "ROC-AUC": roc_auc_score(y_test_np, p_ens),
+    "PR-AUC": average_precision_score(y_test_np, p_ens),
+    "MAP@100": map_at_n(y_test_np, p_ens, 100),
+    "MAP@200": map_at_n(y_test_np, p_ens, 200),
+}
+
+final_table = pd.DataFrame(
+    {
+        "CNN v2 ensemble (5 seeds)": final_cnn,
+        "XGBoost - raw": {"ROC-AUC": 0.8387, "PR-AUC": 0.4627, "MAP@100": 0.9525, "MAP@200": 0.8614},
+        "CNN - both (first version)": {"ROC-AUC": 0.7908, "PR-AUC": 0.3818, "MAP@100": 0.8153, "MAP@200": 0.7733},
+        "XGBoost - engineered": {"ROC-AUC": 0.7832, "PR-AUC": 0.3198, "MAP@100": 0.6487, "MAP@200": 0.5952},
+    }
+).T.round(4)
+
+print("Theft rate in test (PR-AUC baseline):", round(float(y_test_np.mean()), 4))
+display(final_table)
+---END---
+
+--- Cell 83 [markdown] ---
+### Is the CNN vs XGBoost difference real? (single seeds + bootstrap)
+Each seed is scored alone on the test set, and a bootstrap over test consumers gives a 95% confidence interval for the difference between the CNN ensemble and XGBoost on raw readings. This is reporting only, with no further tuning.
+---END---
+
+--- Cell 84 [code] ---
+
+for s, p in zip(seeds, test_probs):
+    print(f"seed {s}: ROC {roc_auc_score(y_test_np, p):.4f} | "
+          f"PR {average_precision_score(y_test_np, p):.4f} | "
+          f"MAP@100 {map_at_n(y_test_np, p, 100):.4f}")
+
+
+rng = np.random.default_rng(42)
+n = len(y_test_np)
+d_pr, d_roc = [], []
+for _ in range(1000):
+    ix = rng.integers(0, n, n)
+    yt = y_test_np[ix]
+    if yt.sum() == 0:
+        continue
+    d_pr.append(average_precision_score(yt, p_ens[ix]) - average_precision_score(yt, xgb_raw_p[ix]))
+    d_roc.append(roc_auc_score(yt, p_ens[ix]) - roc_auc_score(yt, xgb_raw_p[ix]))
+
+for name, d in [("PR-AUC", d_pr), ("ROC-AUC", d_roc)]:
+    lo, hi = np.percentile(d, [2.5, 97.5])
+    print(f"{name} diff (CNN ens - XGB raw): mean {np.mean(d):.4f} | 95% CI [{lo:.4f}, {hi:.4f}]")
+---END---
+
+--- Cell 85 [markdown] ---
+### Step 10: Stacking check (cross-validation on the development set)
+XGBoost on raw readings is compared with and without the out-of-fold CNN probability as an extra feature, using 5-fold cross-validation on the development set only. The test set is not used.
+---END---
+
+--- Cell 86 [code] ---
+import copy
+from sklearn.model_selection import StratifiedKFold, train_test_split
+from torch.utils.data import DataLoader, TensorDataset
+
+def train_v2_idx(tr_ix, va_ix, seed=42, epochs=20, bs=256, lr=1e-3, patience=5):
+    torch.manual_seed(seed)
+    T_a, T_b = make_v2(tr_ix), make_v2(va_ix)
+    model = WideDeepV2(X_1d.shape[1]).to(device)
+    pos_w = torch.tensor((y_np[tr_ix] == 0).sum() / max((y_np[tr_ix] == 1).sum(), 1),
+                         dtype=torch.float32, device=device)
+    loss_fn = nn.BCEWithLogitsLoss(pos_weight=pos_w)
+    opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
+    sched = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, mode="max", factor=0.5, patience=2)
+    g = torch.Generator().manual_seed(seed)
+    loader = DataLoader(TensorDataset(*T_a), batch_size=bs, shuffle=True, generator=g, drop_last=True)
+
+    best_ap, best_state, bad = -1.0, None, 0
+    for ep in range(epochs):
+        model.train()
+        for a, b, t in loader:
+            a, b, t = a.to(device), b.to(device), t.to(device)
+            opt.zero_grad()
+            loss_fn(model(a, b), t).backward()
+            opt.step()
+        val_ap = average_precision_score(y_np[va_ix], predict(model, T_b))
+        sched.step(val_ap)
+        if val_ap > best_ap:
+            best_ap, best_state, bad = val_ap, copy.deepcopy(model.state_dict()), 0
+        else:
+            bad += 1
+            if bad >= patience:
+                break
+    model.load_state_dict(best_state)
+    return model, best_ap
+
+K = 5
+skf = StratifiedKFold(n_splits=K, shuffle=True, random_state=42)
+oof_cnn = np.zeros(len(pos_dev), dtype=np.float32)
+test_cnn_folds = []
+
+for k, (a, b) in enumerate(skf.split(pos_dev, y_np[pos_dev]), 1):
+    tr_full, hold = pos_dev[a], pos_dev[b]
+    tr_ix, va_ix = train_test_split(tr_full, test_size=0.15,
+                                    stratify=y_np[tr_full], random_state=42)
+    model, inner_ap = train_v2_idx(tr_ix, va_ix, seed=42 + k)
+    oof_cnn[b] = predict(model, make_v2(hold))
+    test_cnn_folds.append(predict(model, T_test2))
+    print(f"fold {k}/{K} | inner val PR-AUC {inner_ap:.4f} | "
+          f"held-out PR-AUC {average_precision_score(y_np[hold], oof_cnn[b]):.4f}")
+
+test_cnn = np.mean(test_cnn_folds, axis=0)
+print("\nOOF CNN PR-AUC on the whole dev set:",
+      round(average_precision_score(y_np[pos_dev], oof_cnn), 4))
+---END---
+
+--- Cell 87 [code] ---
+from xgboost import XGBClassifier
+from sklearn.model_selection import StratifiedKFold
+
+Xd_base = np.hstack([raw_np[pos_dev], miss_pct[pos_dev]])
+Xt_base = np.hstack([raw_np[pos_test], miss_pct[pos_test]])
+Xd_stack = np.hstack([Xd_base, oof_cnn.reshape(-1, 1)])
+Xt_stack = np.hstack([Xt_base, test_cnn.reshape(-1, 1)])
+y_d = y_np[pos_dev]
+
+def make_xgb(y_tr):
+    return XGBClassifier(
+        **xgb_search.best_params_, objective="binary:logistic", eval_metric="aucpr",
+        tree_method="hist", device="cuda", scale_pos_weight=(y_tr == 0).sum() / max((y_tr == 1).sum(), 1),
+        n_jobs=-1, random_state=42,
+    )
+
+
+# Leakage-aware outer CV for XGBoost vs Stacking
+
+from sklearn.model_selection import StratifiedKFold, train_test_split
+from sklearn.metrics import average_precision_score
+import numpy as np
+
+outer_cv = StratifiedKFold(
+    n_splits=5, shuffle=True, random_state=7
+)
+
+scores = {"XGB raw": [], "XGB raw + CNN feature": []}
+
+for fold, (tr, va) in enumerate(
+    outer_cv.split(Xd_base, y_d), start=1
+):
+    # Outer training and validation subsets
+    X_tr_base, X_va_base = Xd_base[tr], Xd_base[va]
+    y_tr, y_va = y_d[tr], y_d[va]
+
+    # Map local development indices to original dataset indices
+    tr_global = pos_dev[tr]
+    va_global = pos_dev[va]
+
+    # Generate CNN out-of-fold predictions within outer training data
+    inner_cv = StratifiedKFold(
+        n_splits=5, shuffle=True, random_state=100 + fold
+    )
+    inner_oof = np.zeros(len(tr), dtype=np.float32)
+    outer_va_preds = []
+
+    for inner_tr, inner_va in inner_cv.split(X_tr_base, y_tr):
+        # Separate inner training data for early stopping
+        fit_local, es_local = train_test_split(
+            inner_tr,
+            test_size=0.15,
+            stratify=y_tr[inner_tr],
+            random_state=200 + fold
+        )
+
+        fit_global = tr_global[fit_local]
+        es_global = tr_global[es_local]
+        hold_global = tr_global[inner_va]
+
+        cnn, _ = train_v2_idx(
+            fit_global, es_global, seed=300 + fold * 10 + len(outer_va_preds)
+        )
+
+        # OOF predictions for outer-training rows
+        inner_oof[inner_va] = predict(
+            cnn, make_v2(hold_global)
+        )
+
+        # Predictions on outer validation rows, using no outer-val labels
+        outer_va_preds.append(
+            predict(cnn, make_v2(va_global))
+        )
+
+    # CNN feature for outer validation: average inner-fold models
+    cnn_va = np.mean(outer_va_preds, axis=0)
+
+    # Compare raw XGBoost with stacking on the same outer fold
+    raw_model = make_xgb(y_tr).fit(X_tr_base, y_tr)
+
+    stack_X_tr = np.column_stack([X_tr_base, inner_oof])
+    stack_X_va = np.column_stack([X_va_base, cnn_va])
+
+    stack_model_cv = make_xgb(y_tr).fit(stack_X_tr, y_tr)
+
+    p_raw = raw_model.predict_proba(X_va_base)[:, 1]
+    p_stack_cv = stack_model_cv.predict_proba(stack_X_va)[:, 1]
+
+    scores["XGB raw"].append(
+        average_precision_score(y_va, p_raw)
+    )
+    scores["XGB raw + CNN feature"].append(
+        average_precision_score(y_va, p_stack_cv)
+    )
+
+    print(
+        f"Fold {fold}: "
+        f"Raw XGB PR-AUC={scores['XGB raw'][-1]:.4f} | "
+        f"Stacking PR-AUC={scores['XGB raw + CNN feature'][-1]:.4f}"
+    )
+
+for name, values in scores.items():
+    print(
+        f"{name}: PR-AUC={np.mean(values):.4f} "
+        f"+/- {np.std(values):.4f}"
+    )
+
+---END---
+
+--- Cell 88 [markdown] ---
+### Step 11 (final): Stacking evaluation on the test set and final comparison table
+XGBoost on raw readings is trained once on the full development set with the out-of-fold CNN probability as an extra feature, then scored once on the test set. All models are compared with the same four metrics, plus a bootstrap check of the stacking gain.
+---END---
+
+--- Cell 89 [code] ---
+# Train the final stacking model on all development data
+
+final_stack_model = make_xgb(y_d)
+final_stack_model.fit(Xd_stack, y_d)
+
+print("Final stacking model trained successfully.")
+print("Training features shape:", Xd_stack.shape)
+print("Test features shape:", Xt_stack.shape)
+
+---END---
+
+--- Cell 90 [code] ---
+
+# Step 11: Final stacking evaluation and model comparison
+
+import numpy as np
+import pandas as pd
+from sklearn.metrics import roc_auc_score, average_precision_score
+p_stack = final_stack_model.predict_proba(Xt_stack)[:, 1]
+# 1. Use the existing test probabilities from each model
+# final_model = XGBoost trained on engineered features
+xgb_engineered_p = np.asarray(test_probabilities).ravel()
+xgb_raw_p = np.asarray(raw_test_prob).ravel()
+cnn_ensemble_p = np.asarray(p_ens).ravel()
+stack_p = np.asarray(p_stack).ravel()
+
+# 2. Make sure every prediction matches the test labels
+y_eval = np.asarray(y_test_np).ravel()
+
+predictions = {
+    "XGBoost + CNN (stacking)": stack_p,
+    "CNN v2 ensemble (5 seeds)": cnn_ensemble_p,
+    "XGBoost - raw": xgb_raw_p,
+    "XGBoost - engineered": xgb_engineered_p,
+}
+
+for name, p in predictions.items():
+    if len(p) != len(y_eval):
+        raise ValueError(
+            f"{name}: {len(p)} predictions, "
+            f"but {len(y_eval)} test labels."
+        )
+
+# 3. Calculate all metrics using the same test labels
+def metrics(p):
+    return {
+        "ROC-AUC": roc_auc_score(y_eval, p),
+        "PR-AUC": average_precision_score(y_eval, p),
+        "MAP@100": map_at_n(y_eval, p, 100),
+        "MAP@200": map_at_n(y_eval, p, 200),
+    }
+
+final = pd.DataFrame({
+    name: metrics(p)
+    for name, p in predictions.items()
+}).T.round(4)
+
+print("Test theft rate (PR-AUC baseline):",
+      round(float(y_eval.mean()), 4))
+display(final)
+
+# 4. Bootstrap confidence interval for stacking vs raw XGBoost
+rng = np.random.default_rng(42)
+d = []
+
+for _ in range(1000):
+    ix = rng.integers(0, len(y_eval), len(y_eval))
+    yt = y_eval[ix]
+
+    if yt.sum() == 0:
+        continue
+
+    d.append(
+        average_precision_score(yt, stack_p[ix])
+        - average_precision_score(yt, xgb_raw_p[ix])
+    )
+
+lo, hi = np.percentile(d, [2.5, 97.5])
+
+print(
+    f"PR-AUC difference (stacking - raw XGBoost): "
+    f"{np.mean(d):.4f} | 95% CI [{lo:.4f}, {hi:.4f}]"
+)
+
+---END---
+
+--- Cell 91 [markdown] ---
+# Explanation
+
+
+---END---
+
+--- Cell 92 [markdown] ---
+## 1. Final model and feature names
+---END---
+
+--- Cell 93 [markdown] ---
+**Result:** The final stacking XGBoost model is trained on 33,897 development consumers with 1,036 features each (1,034 daily readings + missing-reading percentage + CNN prediction).
+The test set has 8,475 consumers with the same features.
+---END---
+
+--- Cell 94 [code] ---
+# Use the chronological date order from the original preprocessing cell
+reading_feature_names = list(date_cols)
+
+stack_feature_names = (
+    reading_feature_names
+    + ["Missing_Reading_Percentage", "CNN_Prediction"]
+)
+
+assert len(reading_feature_names) == raw_np.shape[1]
+assert len(stack_feature_names) == Xt_stack.shape[1]
+
+print("Number of reading dates:", len(reading_feature_names))
+print("First 5 dates:", reading_feature_names[:5])
+print("Last 5 dates:", reading_feature_names[-5:])
+print("Total stack features:", len(stack_feature_names))
+
+---END---
+
+--- Cell 95 [markdown] ---
+**Result:** Every column now has a readable name: the 1,034 dates in chronological order, then `Missing_Reading_Percentage` and `CNN_Prediction`.
+Correct names matter because SHAP and LIME report their results by feature name.
+---END---
+
+--- Cell 96 [markdown] ---
+## 2. Global explanation with SHAP (all test consumers)
+---END---
+
+--- Cell 97 [code] ---
+import numpy as np
+import pandas as pd
+import shap
+import matplotlib.pyplot as plt
+
+# Use the existing final stacking model
+X_explain = np.asarray(Xt_stack, dtype=np.float32)
+
+# Explain the final XGBoost stacking model
+explainer = shap.TreeExplainer(final_stack_model)
+
+# Calculate SHAP values for the test set
+shap_values_global = explainer.shap_values(X_explain)
+
+print("Test data shape:", X_explain.shape)
+print("SHAP values shape:", np.asarray(shap_values_global).shape)
+
+---END---
+
+--- Cell 98 [markdown] ---
+**Result:** SHAP values were calculated for all 8,475 test consumers and all 1,036 features.
+Each value shows how much one feature pushed one consumer's score up (toward theft) or down (toward normal).
+---END---
+
+--- Cell 99 [code] ---
+
+# Convert SHAP values to a NumPy array
+sv = np.asarray(shap_values_global)
+
+# Handle the usual binary-classification output shapes
+if sv.ndim == 3:
+    # Some SHAP versions return (samples, features, classes)
+    sv = sv[:, :, 1]
+
+# Global feature importance
+mean_abs_shap = np.abs(sv).mean(axis=0)
+
+global_importance = pd.DataFrame({
+    "Feature": stack_feature_names,
+    "Mean_Absolute_SHAP": mean_abs_shap
+}).sort_values("Mean_Absolute_SHAP", ascending=False)
+
+display(global_importance.head(20))
+
+---END---
+
+--- Cell 100 [markdown] ---
+**Result:** `CNN_Prediction` is by far the most important feature (average impact 1.03); the next feature is only 0.11.
+No single day comes close, so the model mostly relies on the CNN output and uses daily readings only as small corrections.
+---END---
+
+--- Cell 101 [code] ---
+# Use a sample for a clearer, faster summary plot
+rng = np.random.default_rng(42)
+n_plot = min(1000, len(X_explain))
+plot_idx = rng.choice(len(X_explain), size=n_plot, replace=False)
+
+shap.summary_plot(
+    sv[plot_idx],
+    X_explain[plot_idx],
+    feature_names=stack_feature_names,
+    max_display=20,
+    show=True
+)
+
+---END---
+
+--- Cell 102 [markdown] ---
+**Result:** Each dot is one consumer. A high CNN score (red) pushes the prediction toward theft and a low score (blue) pushes it toward normal.
+Individual dates have small effects centered near zero. Grey dots are missing readings.
+---END---
+
+--- Cell 103 [markdown] ---
+## 3. Local explanation for one consumer with SHAP
+---END---
+
+--- Cell 104 [code] ---
+# Get the original consumer IDs corresponding to the test rows
+test_consumer_ids = df.iloc[pos_test]["CONS_NO"].astype(str).to_numpy()
+
+# Map each consumer ID to its row position in Xt_stack
+test_id_to_row = {
+    consumer_id: row_idx
+    for row_idx, consumer_id in enumerate(test_consumer_ids)
+}
+
+print("Number of test IDs:", len(test_id_to_row))
+print("Example ID:", test_consumer_ids[0])
+print("Example row:", test_id_to_row[test_consumer_ids[0]])
+
+---END---
+
+--- Cell 105 [markdown] ---
+**Result:** Every test consumer is linked to their real ID (8,475 IDs), so any consumer can be looked up and explained by ID.
+---END---
+
+--- Cell 106 [code] ---
+import numpy as np
+import pandas as pd
+import shap
+import matplotlib.pyplot as plt
+
+# Correct feature names
+stack_feature_names = (
+    list(date_cols)
+    + ["Missing_Reading_Percentage", "CNN_Prediction"]
+)
+
+# Select one test consumer
+sample_idx = 0
+
+sample_df = pd.DataFrame(
+    Xt_stack[[sample_idx]],
+    columns=stack_feature_names
+)
+
+# Explain the final XGBoost stacking model
+explainer = shap.TreeExplainer(final_stack_model)
+sample_shap = explainer.shap_values(sample_df)
+
+print("Actual label:", y_test_np[sample_idx])
+print(
+    "Predicted probability:",
+    final_stack_model.predict_proba(sample_df)[0, 1]
+)
+
+shap.plots.waterfall(
+    shap.Explanation(
+        values=sample_shap[0],
+        base_values=explainer.expected_value,
+        data=sample_df.iloc[0].to_numpy(),
+        feature_names=stack_feature_names
+    ),
+    max_display=15
+)
+
+---END---
+
+--- Cell 107 [markdown] ---
+**Result:** This consumer is a real theft case (label 1) and the model gives a 62.5% theft probability.
+The waterfall starts from the average model output and shows which features push the score up or down. `CNN_Prediction` is the main driver.
+---END---
+
+--- Cell 108 [code] ---
+def explain_consumer(model, explainer, consumer_features, feature_names, top_n=5):
+    """
+    Explain one consumer's prediction.
+    consumer_features must contain the same features,
+    in the same order, used to train the final model.
+    """
+    X_one = np.asarray(consumer_features).reshape(1, -1)
+
+    if X_one.shape[1] != len(feature_names):
+        raise ValueError(
+            f"Expected {len(feature_names)} features, "
+            f"but received {X_one.shape[1]}."
+        )
+
+    probability = float(model.predict_proba(X_one)[0, 1])
+    raw_margin = float(model.predict(X_one, output_margin=True)[0])
+
+    shap_result = explainer.shap_values(X_one)
+
+    if isinstance(shap_result, list):
+        shap_result = shap_result[1]
+
+    shap_result = np.asarray(shap_result)
+
+    if shap_result.ndim == 3:
+        shap_row = shap_result[0, :, 1]
+    else:
+        shap_row = shap_result.reshape(-1)
+
+    result = pd.DataFrame({
+        "Feature": feature_names,
+        "Feature_Value": X_one[0],
+        "SHAP_Value": shap_row
+    })
+
+    result["Impact"] = np.where(
+        result["SHAP_Value"] > 0,
+        "Increases model output",
+        "Decreases model output"
+    )
+
+    result["Absolute_Impact"] = result["SHAP_Value"].abs()
+
+    top_features = (
+        result.nlargest(top_n, "Absolute_Impact")
+        .drop(columns="Absolute_Impact")
+        .reset_index(drop=True)
+    )
+
+    return {
+        "probability": probability,
+        "raw_margin": raw_margin,
+        "top_features": top_features,
+        "all_shap_values": result
+    }
+
+---END---
+
+--- Cell 109 [markdown] ---
+**Result:** A reusable function. Give it one consumer's features and it returns the theft probability and the top features with their SHAP effect.
+---END---
+
+--- Cell 110 [code] ---
+# Select a consumer using an actual ID from the test set
+consumer_id = test_consumer_ids[0]
+
+row_idx = test_id_to_row[consumer_id]
+
+consumer_result = explain_consumer(
+    model=final_stack_model,
+    explainer=explainer,
+    consumer_features=Xt_stack[row_idx],
+    feature_names=stack_feature_names,
+    top_n=10
+)
+
+print("Consumer ID:", consumer_id)
+print(
+    f"Predicted probability: "
+    f"{consumer_result['probability']:.2%}"
+)
+
+display(consumer_result["top_features"])
+
+---END---
+
+--- Cell 111 [markdown] ---
+**Result:** The same consumer looked up by ID: 62.54% theft probability. `CNN_Prediction` adds +1.20, far more than anything else.
+The other top features (missing percentage and a few dates) each change the score by only about 0.1 or less.
+---END---
+
+--- Cell 112 [markdown] ---
+## 4. LIME explanation for the same consumer
+---END---
+
+--- Cell 113 [code] ---
+import numpy as np
+from lime.lime_tabular import LimeTabularExplainer
+
+X_reference = np.asarray(Xd_stack, dtype=np.float64)
+X_test = np.asarray(Xt_stack, dtype=np.float64)
+
+# Replace infinities with NaN first
+X_reference[~np.isfinite(X_reference)] = np.nan
+
+# Calculate feature means, ignoring missing values
+feature_means = np.nanmean(X_reference, axis=0)
+feature_means = np.where(np.isfinite(feature_means), feature_means, 0.0)
+
+# Impute missing values in the LIME reference dataset
+X_reference_lime = np.where(
+    np.isfinite(X_reference),
+    X_reference,
+    feature_means
+)
+
+# Remove constant features from LIME's explanation space
+feature_std = X_reference_lime.std(axis=0)
+keep_features = feature_std > 1e-8
+
+X_reference_lime = X_reference_lime[:, keep_features]
+feature_names_lime = np.asarray(stack_feature_names)[keep_features].tolist()
+
+print("Reference shape:", X_reference_lime.shape)
+print("Features retained:", len(feature_names_lime))
+print("Remaining non-finite:", np.sum(~np.isfinite(X_reference_lime)))
+
+lime_explainer = LimeTabularExplainer(
+    training_data=X_reference_lime,
+    feature_names=feature_names_lime,
+    class_names=["Normal", "Flagged"],
+    mode="classification",
+    discretize_continuous=False,
+    random_state=42
+)
+
+print("New LIME explainer created.")
+---END---
+
+--- Cell 114 [markdown] ---
+**Result:** LIME needs a clean reference set, so missing readings are filled with column averages. No constant columns were found, so all 1,036 features are kept.
+This is only used to build LIME's explanations; the model is not changed.
+---END---
+
+--- Cell 115 [code] ---
+sample_idx = 0
+
+consumer_original = X_test[sample_idx].copy()
+consumer_lime = consumer_original[keep_features].copy()
+
+# Use the original missing-value pattern for this consumer
+missing_mask = ~np.isfinite(consumer_original)
+
+def predict_proba_for_lime(data):
+    data = np.asarray(data, dtype=np.float64)
+
+    # Reconstruct the full model input
+    full_data = np.tile(
+        consumer_original,
+        (data.shape[0], 1)
+    )
+
+    # Replace only the features retained by LIME
+    full_data[:, keep_features] = data
+
+    # Preserve original missing readings for this consumer
+    full_data[:, missing_mask] = np.nan
+
+    return final_stack_model.predict_proba(
+        full_data.astype(np.float32)
+    )
+
+print("Original model probability:",
+      final_stack_model.predict_proba(
+          consumer_original.reshape(1, -1)
+      )[0, 1])
+---END---
+
+--- Cell 116 [markdown] ---
+**Result:** A helper that lets LIME query the real model while keeping this consumer's original missing readings missing, so LIME does not invent data.
+The model's own theft probability for this consumer is 0.6254.
+---END---
+
+--- Cell 117 [code] ---
+import numpy as np
+import pandas as pd
+import shap
+
+sample_idx = 0
+
+# Original consumer row, including its original NaN values
+consumer_original = np.asarray(
+    Xt_stack[sample_idx], dtype=np.float32
+)
+
+consumer_id = test_consumer_ids[sample_idx]
+
+# LIME receives the finite representation created earlier
+consumer_lime = consumer_original.copy()
+consumer_lime = np.where(
+    np.isfinite(consumer_lime),
+    consumer_lime,
+    feature_means
+)
+
+consumer_lime = consumer_lime[keep_features]
+
+# Reuse the existing prediction function that preserves
+# this consumer's original missing-value positions
+lime_exp_same = lime_explainer.explain_instance(
+    data_row=consumer_lime,
+    predict_fn=predict_proba_for_lime,
+    labels=(1,),
+    num_features=10,
+    num_samples=500
+)
+
+original_probability = final_stack_model.predict_proba(
+    consumer_original.reshape(1, -1)
+)[0, 1]
+
+print("Consumer ID:", consumer_id)
+print(f"Original model probability: {original_probability:.4f}")
+print(f"LIME local prediction: {float(lime_exp_same.local_pred[0]):.4f}")
+print("\nLIME explanation:")
+for feature, weight in lime_exp_same.as_list(label=1):
+    print(f"{feature:30s} {weight:+.5f}")
+---END---
+
+--- Cell 118 [markdown] ---
+**Result:** LIME also says `CNN_Prediction` matters most (+0.18), followed by small effects from a few dates in Feb 2016 and the missing percentage.
+However, LIME's local estimate (0.85) is far from the model's real probability (0.63), so it should be read as a rough guide only.
+---END---
+
+--- Cell 119 [code] ---
+# 1. SHAP explanation for the same consumer
+shap_explainer = shap.TreeExplainer(final_stack_model)
+
+shap_output = shap_explainer.shap_values(
+    consumer_original.reshape(1, -1)
+)
+
+if isinstance(shap_output, list):
+    shap_row = np.asarray(shap_output[1])[0]
+else:
+    shap_output = np.asarray(shap_output)
+
+    if shap_output.ndim == 3:
+        # Handle class-specific SHAP output if returned
+        shap_row = shap_output[0, :, 1]
+    else:
+        shap_row = shap_output[0]
+
+# 2. Build SHAP table
+shap_df = pd.DataFrame({
+    "Feature": stack_feature_names,
+    "SHAP_Value": shap_row
+})
+
+shap_df["SHAP_Importance"] = shap_df["SHAP_Value"].abs()
+
+# 3. Extract LIME weights using original feature indices
+lime_map = lime_exp_same.as_map()[1]
+
+lime_df = pd.DataFrame([
+    {
+        "Feature": feature_names_lime[idx],
+        "LIME_Weight": weight
+    }
+    for idx, weight in lime_map
+])
+
+lime_df["LIME_Importance"] = lime_df["LIME_Weight"].abs()
+
+# 4. Compare only features selected by LIME
+comparison = shap_df.merge(
+    lime_df,
+    on="Feature",
+    how="inner",
+    validate="one_to_one"
+)
+
+comparison["SHAP_Rank_Common"] = (
+    comparison["SHAP_Importance"]
+    .rank(method="min", ascending=False)
+    .astype(int)
+)
+
+comparison["LIME_Rank_Common"] = (
+    comparison["LIME_Importance"]
+    .rank(method="min", ascending=False)
+    .astype(int)
+)
+
+comparison = comparison.sort_values("LIME_Rank_Common")
+
+display(
+    comparison[
+        [
+            "Feature",
+            "SHAP_Value",
+            "SHAP_Rank_Common",
+            "LIME_Weight",
+            "LIME_Rank_Common"
+        ]
+    ].round(5)
+)
+---END---
+
+--- Cell 120 [markdown] ---
+**Result:** SHAP and LIME agree on the main driver: `CNN_Prediction` is rank 1 in both.
+For the smaller features their order differs (for example, the missing percentage is 2nd for SHAP but 5th for LIME), so only the top feature is clearly confirmed.
+---END---
+
+--- Cell 121 [code] ---
+import numpy as np
+import pandas as pd
+import shap
+
+# The stacking model has no saved threshold, so 0.5 is used here. Change it if you prefer another cut-off.
+THRESHOLD = 0.5
+
+p_test = final_stack_model.predict_proba(Xt_stack)[:, 1]
+y_true = np.asarray(y_test_np).ravel()
+
+normal_idx = np.where(y_true == 0)[0]
+theft_idx  = np.where(y_true == 1)[0]
+
+# 1) Normal consumer the model is most sure about (true negative)
+tn_row = normal_idx[np.argmin(p_test[normal_idx])]
+
+# 2) Normal consumer the model suspects the most (false positive)
+fp_row = normal_idx[np.argmax(p_test[normal_idx])]
+
+# 3) Theft consumer the model misses the most (false negative)
+fn_row = theft_idx[np.argmin(p_test[theft_idx])]
+
+cases = pd.DataFrame({
+    "Case": ["Normal (true negative)", "Normal flagged (false positive)", "Theft missed (false negative)"],
+    "Row": [tn_row, fp_row, fn_row],
+    "Actual": [y_true[tn_row], y_true[fp_row], y_true[fn_row]],
+    "Theft_probability": [p_test[tn_row], p_test[fp_row], p_test[fn_row]],
+})
+display(cases)
+---END---
+
+--- Cell 122 [code] ---
+def show_case(row_idx, title, top_n=10):
+    res = explain_consumer(
+        model=final_stack_model,
+        explainer=explainer,
+        consumer_features=Xt_stack[row_idx],
+        feature_names=stack_feature_names,
+        top_n=top_n
+    )
+
+    print(title)
+    print("Consumer ID:", test_consumer_ids[row_idx])
+    print("Actual label:", int(y_true[row_idx]))
+    print(f"Predicted theft probability: {res['probability']:.2%}")
+    display(res["top_features"])
+
+    shap_row = res["all_shap_values"]["SHAP_Value"].to_numpy()
+    base_value = float(np.asarray(explainer.expected_value).reshape(-1)[-1])
+
+    shap.plots.waterfall(
+        shap.Explanation(
+            values=shap_row,
+            base_values=base_value,
+            data=Xt_stack[row_idx],
+            feature_names=stack_feature_names
+        ),
+        max_display=12
+    )
+---END---
+
+--- Cell 123 [code] ---
+show_case(tn_row, "Normal consumer (true negative)")
+show_case(fp_row, "Normal consumer flagged by the model (false positive)")
+show_case(fn_row, "Theft consumer missed by the model (false negative)")
+---END---
+
+--- Cell 124 [markdown] ---
+## 5. How reliable is LIME?
+---END---
+
+--- Cell 125 [code] ---
+from lime.lime_tabular import LimeTabularExplainer
+import numpy as np
+
+seeds = [11, 22, 33, 44, 55]
+num_features = 10
+num_samples = 3000
+
+lime_runs = []
+lime_rankings = []
+
+for seed in seeds:
+    print(f"Running LIME with seed={seed}...")
+
+    explainer_seed = LimeTabularExplainer(
+        training_data=X_reference_lime,
+        feature_names=feature_names_lime,
+        class_names=["Normal", "Flagged"],
+        mode="classification",
+        discretize_continuous=False,
+        random_state=seed
+    )
+
+    exp = explainer_seed.explain_instance(
+        data_row=consumer_lime,
+        predict_fn=predict_proba_for_lime,
+        labels=(1,),
+        num_features=num_features,
+        num_samples=num_samples
+    )
+
+    weights = dict(exp.as_list(label=1))
+
+    lime_runs.append({
+        "seed": seed,
+        "weights": weights,
+        "local_prediction": float(exp.local_pred[0])
+    })
+
+    ranked = sorted(
+        weights.items(),
+        key=lambda item: abs(item[1]),
+        reverse=True
+    )
+
+    lime_rankings.append([feature for feature, weight in ranked])
+
+print(f"\nCompleted: {len(lime_runs)} LIME runs.")
+---END---
+
+--- Cell 126 [markdown] ---
+**Result:** LIME was run 5 times with different random seeds on the same consumer to see whether its answer stays the same.
+---END---
+
+--- Cell 127 [code] ---
+from itertools import combinations
+
+top_sets = [
+    set(ranking[:10])
+    for ranking in lime_rankings
+]
+
+jaccard_scores = []
+
+for i, j in combinations(range(len(top_sets)), 2):
+    intersection = len(top_sets[i] & top_sets[j])
+    union = len(top_sets[i] | top_sets[j])
+
+    jaccard_scores.append(
+        intersection / union if union else 1.0
+    )
+
+mean_jaccard = np.mean(jaccard_scores)
+
+print(f"Mean top-10 Jaccard similarity: {mean_jaccard:.3f}")
+
+if mean_jaccard >= 0.8:
+    print("Interpretation: High overlap in top features.")
+elif mean_jaccard >= 0.5:
+    print("Interpretation: Moderate overlap; some features change.")
+else:
+    print("Interpretation: Low overlap; explanations may be unstable.")
+---END---
+
+--- Cell 128 [markdown] ---
+**Result:** Only about 43% of the top-10 features are shared between runs, so LIME's smaller features change from run to run (unstable).
+---END---
+
+--- Cell 129 [code] ---
+all_features = sorted(set(
+    feature
+    for run in lime_runs
+    for feature in run["weights"]
+))
+
+stability_df = pd.DataFrame({
+    "Feature": all_features,
+    **{
+        f"Seed_{run['seed']}": [
+            run["weights"].get(feature, 0.0)
+            for feature in all_features
+        ]
+        for run in lime_runs
+    }
+})
+
+weight_columns = [f"Seed_{seed}" for seed in seeds]
+
+stability_df["Mean_Weight"] = stability_df[weight_columns].mean(axis=1)
+stability_df["Std_Weight"] = stability_df[weight_columns].std(axis=1)
+stability_df["Mean_Abs_Weight"] = (
+    stability_df[weight_columns].abs().mean(axis=1)
+)
+
+stability_df = stability_df.sort_values(
+    "Mean_Abs_Weight",
+    ascending=False
+)
+
+display(stability_df.head(15).round(4))
+---END---
+
+--- Cell 130 [markdown] ---
+**Result:** `CNN_Prediction` is stable (weight about 0.188 in every run), and a few features such as `2016/2/3` are fairly stable too.
+Most other dates appear and disappear between runs, so they should not be trusted individually.
+---END---
+
+--- Cell 131 [code] ---
+import numpy as np
+from lime.lime_tabular import LimeTabularExplainer
+
+n_readings = len(date_cols)
+
+# Daily readings that are observed for this consumer
+observed_mask = np.isfinite(consumer_original[:n_readings])
+
+# Keep observed daily readings + the two engineered features
+engineered_idx = [
+    stack_feature_names.index("Missing_Reading_Percentage"),
+    stack_feature_names.index("CNN_Prediction")
+]
+
+selected_idx = np.concatenate([
+    np.where(observed_mask)[0],
+    np.array(engineered_idx)
+])
+
+selected_idx = np.unique(selected_idx)
+
+X_reference_full = np.asarray(Xd_stack, dtype=np.float64)
+X_reference_selected = X_reference_full[:, selected_idx]
+
+# Impute non-finite reference values using training-column means
+col_means = np.nanmean(
+    np.where(np.isfinite(X_reference_selected),
+             X_reference_selected, np.nan),
+    axis=0
+)
+col_means = np.where(np.isfinite(col_means), col_means, 0.0)
+
+X_reference_selected = np.where(
+    np.isfinite(X_reference_selected),
+    X_reference_selected,
+    col_means
+)
+
+selected_names = [
+    stack_feature_names[i] for i in selected_idx
+]
+
+consumer_selected = consumer_original[selected_idx].astype(float)
+consumer_selected = np.where(
+    np.isfinite(consumer_selected),
+    consumer_selected,
+    col_means
+)
+
+print("Selected features:", len(selected_idx))
+print("Observed daily readings:", int(observed_mask.sum()))
+print("Reference NaNs:", np.isnan(X_reference_selected).sum())
+---END---
+
+--- Cell 132 [markdown] ---
+**Result:** A second LIME attempt that uses only the readings this consumer really has (561 days) plus the 2 extra features, giving 563 features in total.
+The goal is to stop LIME from spending effort on missing days.
+---END---
+
+--- Cell 133 [code] ---
+def predict_proba_selected(data):
+    data = np.asarray(data, dtype=np.float32)
+
+    full_data = np.repeat(
+        consumer_original.reshape(1, -1),
+        repeats=len(data),
+        axis=0
+    )
+
+    # Update only the selected features
+    full_data[:, selected_idx] = data
+
+    # Preserve the original missing-reading positions
+    original_missing_mask = ~np.isfinite(
+        consumer_original[:n_readings]
+    )
+
+    full_data[:, :n_readings][:, original_missing_mask] = np.nan
+
+    return final_stack_model.predict_proba(full_data)
+---END---
+
+--- Cell 134 [markdown] ---
+**Result:** The prediction helper for the reduced feature set. It updates only the selected features and keeps the consumer's missing readings as missing.
+---END---
+
+--- Cell 135 [code] ---
+lime_explainer_selected = LimeTabularExplainer(
+    training_data=X_reference_selected,
+    feature_names=selected_names,
+    class_names=["Normal", "Flagged"],
+    mode="classification",
+    discretize_continuous=False,
+    random_state=42
+)
+
+lime_exp_selected = lime_explainer_selected.explain_instance(
+    data_row=consumer_selected,
+    predict_fn=predict_proba_selected,
+    labels=(1,),
+    num_features=10,
+    num_samples=3000
+)
+
+original_probability = final_stack_model.predict_proba(
+    consumer_original.reshape(1, -1)
+)[0, 1]
+
+print(f"Original model probability: {original_probability:.4f}")
+print(
+    "LIME local prediction:",
+    f"{float(lime_exp_selected.local_pred[0]):.4f}"
+)
+print(
+    "Absolute gap:",
+    f"{abs(original_probability - float(lime_exp_selected.local_pred[0])):.4f}"
+)
+
+for feature, weight in lime_exp_selected.as_list(label=1):
+    print(f"{feature:30s} {weight:+.5f}")
+---END---
+
+--- Cell 136 [markdown] ---
+**Result:** The picture is the same: `CNN_Prediction` dominates (+0.19), but LIME's estimate (0.88) is still far from the model's 0.63.
+So the gap is not caused by missing days. SHAP is the more reliable explanation for this model.
+---END---
+
+--- Cell 137 [markdown] ---
+## 6. Export for the app
+---END---
+
+--- Cell 138 [code] ---
+from pathlib import Path
+import joblib
+import numpy as np
+
+output_dir = Path(
+    r"C:\Users\Legion\Documents\SIC8\Tasks\SIC\Sic_Grad"
+)
+output_dir.mkdir(parents=True, exist_ok=True)
+
+joblib.dump(final_stack_model, output_dir / "final_stack_model.joblib")
+joblib.dump(explainer, output_dir / "explainer.joblib")
+np.save(output_dir / "Xt_stack.npy", Xt_stack)
+joblib.dump(stack_feature_names, output_dir / "stack_feature_names.joblib")
+joblib.dump(test_consumer_ids, output_dir / "test_consumer_ids.joblib")
+
+print("Saved files:")
+for file in output_dir.iterdir():
+    print(file.name)
+---END---
+
+--- Cell 139 [markdown] ---
+# Save Weights
+---END---
+
+--- Cell 140 [code] ---
+from pathlib import Path
+import torch
+
+model_dir = Path("artifacts")
+model_dir.mkdir(parents=True, exist_ok=True)
+
+for i, model in enumerate(ens_models, start=1):
+    torch.save(
+        model.state_dict(),
+        model_dir / f"cnn_model_{i}.pth"
+    )
+
+print("CNN models saved successfully.")
+---END---
+
+--- Cell 141 [code] ---
+model = WideDeepV2(
+    wide_in=1035,
+    in_ch=2
+)
+
+model.load_state_dict(
+    torch.load(
+        "artifacts/cnn_model_1.pth",
+        map_location="cpu",
+        weights_only=True
+    )
+)
+
+model.eval()
+---END---
+
+--- Cell 142 [code] ---
+import numpy as np
+
+EXPECTED_READINGS = 1034
+
+
+def validate_readings(readings):
+    values = np.asarray(readings, dtype=np.float32)
+
+    if values.ndim != 1:
+        raise ValueError("Readings must be a one-dimensional list.")
+
+    if len(values) != EXPECTED_READINGS:
+        raise ValueError(
+            f"Expected {EXPECTED_READINGS} readings, "
+            f"received {len(values)}."
+        )
+
+    finite_or_missing = np.isfinite(values) | np.isnan(values)
+
+    if not finite_or_missing.all():
+        raise ValueError(
+            "Readings must contain valid numbers or missing values."
+        )
+
+    return values
+---END---
+
+--- Cell 143 [code] ---
+
+---END---

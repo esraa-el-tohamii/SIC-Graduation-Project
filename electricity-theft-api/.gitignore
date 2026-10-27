@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+*.pyc
+.env
+.venv/
+venv/
+*.log
+logs/
+data/
+*.csv
+*.ipynb
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Local development outputs; production artifacts are intentionally tracked.
+coverage.xml
+.coverage

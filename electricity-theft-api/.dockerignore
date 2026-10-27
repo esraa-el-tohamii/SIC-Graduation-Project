@@ -1,0 +1,51 @@
+# ── Python ────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Environments ──────────────────────────────────────────────────────────
+.env
+.venv/
+venv/
+env/
+
+# ── Notebooks and training data ───────────────────────────────────────────
+# NEVER copy the dataset or raw notebook into the Docker image
+*.ipynb
+*.ipynb_checkpoints/
+data/
+data.csv
+*.csv
+
+# ── Development / IDE files ────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Tests (not needed at runtime) ─────────────────────────────────────────
+tests/
+
+# ── Git ────────────────────────────────────────────────────────────────────
+.git/
+.gitignore
+
+# ── Documentation ─────────────────────────────────────────────────────────
+README.md
+*.md
+
+# ── Secrets ───────────────────────────────────────────────────────────────
+.env.example
+*.key
+*.pem
+secrets/

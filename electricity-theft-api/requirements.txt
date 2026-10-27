@@ -1,0 +1,36 @@
+# ── Core API framework ─────────────────────────────────────────────────────
+# Tested with Python 3.13 on Windows.  Minimum supported: Python 3.10.
+fastapi==0.116.1
+uvicorn[standard]==0.35.0
+pydantic==2.11.7
+
+# ── ML inference ──────────────────────────────────────────────────────────
+# PyTorch: install the CPU-only wheel via the PyTorch index (see NOTE below).
+# The version listed here matches what is installed in the dev environment.
+torch==2.4.1          # CPU-only wheel; see NOTE below
+xgboost==3.0.0
+scikit-learn==1.5.2   # required by joblib for XGBoost compatibility
+joblib==1.4.2
+numpy==1.26.4
+
+# ── Testing ────────────────────────────────────────────────────────────────
+pytest==8.3.3
+httpx==0.27.2         # required by FastAPI TestClient (via Starlette)
+
+# ── Explainability ─────────────────────────────────────────────────────────
+shap==0.46.0
+
+# NOTE — PyTorch CPU-only wheel
+# The torch==2.4.1 CPU-only wheel is NOT published to PyPI.
+# Install it explicitly before running pip install -r requirements.txt:
+#
+#   pip install torch==2.4.1 --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements.txt
+#
+# The Dockerfile handles this automatically.
+#
+# Dev environment actually uses torch==2.14.0+cpu (installed globally on this
+# machine).  The API is compatible with any torch >= 2.0 CPU build.
+# Pin to 2.4.1 for reproducibility in the Docker image.
+# If you need a newer version in Docker, change both this file and the
+# Dockerfile RUN line.
