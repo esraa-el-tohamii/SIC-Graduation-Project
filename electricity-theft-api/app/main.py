@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import math
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query, Request, status
@@ -27,6 +28,7 @@ from app.config import (
     ARTIFACTS_DIR,
     DEFAULT_THRESHOLD,
     EXPECTED_READINGS,
+    FRONTEND_API_BASE_URL,
     MODEL_VERSION,
 )
 from app.model_loader import load_all_artifacts, get_store
@@ -43,6 +45,8 @@ from app.schemas import (
 )
 from app.inference import explain_inference, run_inference, run_inference_batch
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.staticfiles import StaticFiles
 
 # ── Logging ────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -91,6 +95,22 @@ if ALLOWED_ORIGINS:
         allow_credentials=False,
         allow_methods=["GET", "POST"],
         allow_headers=["*"],
+    )
+
+FRONTEND_STATIC_DIR = Path(__file__).resolve().parent / "static"
+if FRONTEND_STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=FRONTEND_STATIC_DIR), name="static")
+
+
+@app.get("/config.js", include_in_schema=False)
+def frontend_config() -> PlainTextResponse:
+    api_base = FRONTEND_API_BASE_URL or ""
+    return PlainTextResponse(
+        "window.GRIDGUARD_API_BASE_URL = "
+        + repr(api_base)
+        + ";",
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-store"},
     )
 
 
@@ -160,6 +180,8 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 @app.get("/", tags=["System"])
 def root() -> dict:
+    if FRONTEND_STATIC_DIR.is_dir() and (FRONTEND_STATIC_DIR / "index.html").is_file():
+        return FileResponse(FRONTEND_STATIC_DIR / "index.html")
     return {
         "message": "Electricity Theft Detection API",
         "status": "ok",

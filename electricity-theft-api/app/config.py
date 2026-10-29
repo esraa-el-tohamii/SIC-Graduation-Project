@@ -47,3 +47,4 @@ ALLOWED_ORIGINS = [
     for origin in os.environ.get("ALLOWED_ORIGINS", "").split(",")
     if origin.strip()
 ]
+FRONTEND_API_BASE_URL = os.environ.get("GRIDGUARD_API_BASE_URL", "").strip()

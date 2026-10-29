@@ -79,7 +79,9 @@ $env:MODEL_ARTIFACTS_DIR = "C:\path\to\electricity-theft-api\artifacts"
 
 Optional browser CORS origins are configured with a comma-separated
 `ALLOWED_ORIGINS` value. CORS is disabled when it is empty. Keep secrets out
-of `.env.example` and source control.
+of `.env.example` and source control. `GRIDGUARD_API_BASE_URL` is optional and
+is exposed to the served static frontend through `/config.js`; leave it empty
+when the frontend is served by this FastAPI app.
 
 ## Run
 
@@ -89,6 +91,11 @@ python -m uvicorn app.main:app --reload
 
 Swagger UI is available at `http://127.0.0.1:8000/docs`; ReDoc is available at
 `http://127.0.0.1:8000/redoc`.
+The integrated GridGuard frontend is available at `http://127.0.0.1:8000/`.
+
+To run the frontend separately, from the sibling `Forntend` directory set
+`GRIDGUARD_API_BASE_URL=http://127.0.0.1:8000`, run `python serve.py 8001`,
+and allow `http://127.0.0.1:8001` in `ALLOWED_ORIGINS`.
 
 ## Endpoints
 
